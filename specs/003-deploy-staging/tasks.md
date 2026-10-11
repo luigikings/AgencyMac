@@ -91,7 +91,8 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm format:check` y `pnpm quality` terminan con código 0, y `no-leaks` no encuentra nada.
     - Todo commiteado en local, **sin push**.
 
-- [ ] **Parada final (coordinador, no implementer). Autorización y alta (RP-2, RF-38, sección 10 del plan).** RF-1, RF-7, RF-8, RF-35, RF-37, RF-39
+- [x] **Parada final (coordinador, no implementer). Autorización y alta (RP-2, RF-38, sección 10 del plan).** RF-1, RF-7, RF-8, RF-35, RF-37, RF-39
   - El coordinador pide la autorización al usuario y le guía: crear el entorno `staging` restringido a main → push a main (CI en verde con el despliegue omitido por falta de secretos) → crear los tres secretos → relanzar → despliegue y smoke en verde.
   - Se anotan en la spec: fecha de autorización; RF-7 (panel), RF-8 (coste 0 €), RF-35 (restricción del entorno), RF-38 (alta), RF-39 (registro sin la URL en claro); revisión del usuario en el móvil y en escritorio (inicio y 404, ES y EN); cabecera `X-Robots-Tag: noindex` comprobada.
   - Si el smoke real difiere de lo observado en T5: RP-3 o RP-4, con tareas nuevas.
+  - Hecha el 2026-10-11: push 15bbcf3 con despliegue omitido en verde (RF-37); alta y secretos en el entorno restringido a main (RF-35, RF-38, RP-2); despliegue y smoke reales en verde, sin diferencias con `wrangler dev` (RP-3); registro sin la URL en claro (RF-39); 0 € (RF-8); revisión visual del usuario correcta. Detalle en la spec, sección "Verificación final".

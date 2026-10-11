@@ -1,6 +1,6 @@
 # Spec 003 — Entorno de prueba (staging) y CI
 
-Estado: aprobada (2026-10-11)
+Estado: implementada (2026-10-11)
 
 Depende de: spec 002 (esqueleto de la web pública), ya implementada.
 
@@ -140,6 +140,7 @@ Métodos de verificación:
 - Smoke test en rojo tras desplegar: la versión queda publicada en staging, sin vuelta atrás; se arregla con otro push (RF-5).
 - Dos pushes seguidos a main: se cancela el CI antiguo, nunca un despliegue en curso; los despliegues van en serie y nunca se publica un commit anterior (RF-4, RF-33).
 - Relanzar a mano una ejecución antigua de main: si su commit ya no es la punta de main, el despliegue se omite en verde (RF-4).
+- La comprobación previa no puede leer la punta de main (fallo de red o de git): el despliegue se omite en verde con un aviso, nunca se despliega a ciegas (RF-4).
 - PR desde un fork o PR que modifica el propio workflow: no recibe secretos ni despliega (RF-29, RF-35).
 - Faltan uno, dos o los tres secretos: despliegue omitido con aviso y CI en verde (RF-37).
 - Token caducado o revocado: falla el paso de despliegue en rojo y se renueva según el alta (RF-38).
@@ -197,6 +198,20 @@ Decididas o confirmadas por el usuario el 2026-10-11.
 ## Dudas abiertas
 
 - Ninguna.
+
+## Verificación final (2026-10-11)
+
+Validación del reviewer: VEREDICTO: APROBADO. Comprobaciones reales y manuales de la parada final (sin URL, subdominio ni ID de cuenta en este documento):
+
+- **RF-37 (real):** el primer push a main (15bbcf3) dejó el CI en verde y el despliegue omitido con tres avisos, uno por secreto, solo con su nombre.
+- **RF-35 y RF-38 (manual):** el usuario hizo el alta: cuenta, subdominio de `workers.dev` y token, y creó el entorno "staging" restringido a main (comprobado por la API de GitHub: política de ramas personalizada con la regla `main`), con los tres secretos guardados en el entorno y ninguno en el repositorio.
+- **RP-2:** autorización del despliegue el 2026-10-11, al crear el usuario los secretos.
+- **RF-1, RF-10, RF-13 a RF-27 (real):** al relanzar el CI, `check`, `deploy` y el smoke test real terminaron en verde. La URL de prueba responde 200 con `x-robots-tag: noindex` y `x-staging-version` = 15bbcf3.
+- **RP-3:** el smoke real no muestra ninguna diferencia con lo observado con `wrangler dev` en T5; no hubo nada que ajustar.
+- **RF-39 (manual):** en el registro público del CI (1013 líneas), la URL solo aparece como `***.workers.dev`.
+- **RF-8 (manual):** plan gratuito de Workers (100.000 peticiones al día) y minutos gratuitos de Actions en repo público; coste 0 €.
+- **RF-7:** la parte automática (test de `wrangler.json`: sin rutas, dominios ni `account_id`) está en verde. El despliegue usa solo `*.workers.dev`.
+- **Revisión visual del usuario** en móvil y escritorio, inicio y 404, ES y EN: sin incidencias.
 
 ## Notas de cambios
 
