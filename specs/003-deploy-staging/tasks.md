@@ -13,10 +13,10 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - `git check-ignore` confirma `.wrangler/` y `apps/web/.staging/`.
     - `pnpm test`, `pnpm lint` y `pnpm format:check` siguen en verde.
 
-- [ ] **T2. Anti-filtraciones y build sin `noindex`: primero `scripts/lib/leaks.test.mjs`, `scripts/no-leaks.test.mjs`, `scripts/lib/dist-check.test.mjs` y `apps/web/e2e/dist-clean.spec.ts`; después `scripts/lib/leaks.mjs` (reglas a/b/c de la sección 6 del plan) y `scripts/lib/dist-check.mjs`.** RF-9, RF-12, RF-36, RNF-9
+- [x] **T2. Anti-filtraciones y build sin `noindex`: primero `scripts/lib/leaks.test.mjs`, `scripts/no-leaks.test.mjs`, `scripts/lib/dist-check.test.mjs` y `apps/web/e2e/dist-clean.spec.ts`; después `scripts/lib/leaks.mjs` (reglas a/b/c de la sección 6 del plan) y `scripts/lib/dist-check.mjs`.** RF-9, RF-12, RF-36, RNF-9
   - Hecho cuando:
-    - Los tests pasaron de rojo a verde; los marcadores `agencymac-staging.<subdominio>.workers.dev`, `<subdominio de la cuenta>.workers.dev` y `*.workers.dev` no fallan, y `ejemplo123.workers.dev` sí.
-    - Al añadir temporalmente `CLOUDFLARE_API_TOKEN=abc` a un archivo versionado de prueba, `pnpm test` falla con archivo y línea (se revierte).
+    - Los tests pasaron de rojo a verde; los marcadores `agencymac-staging.<subdominio>.workers.dev`, `<subdominio de la cuenta>.workers.dev` y `*.workers.dev` no fallan, y `ejemplo123` seguido de `.workers.dev` sí.
+    - Al añadir temporalmente `CLOUDFLARE_API_TOKEN` con el valor `abc` a un archivo versionado de prueba, `pnpm test` falla con archivo y línea (se revierte).
     - Al añadir temporalmente un meta robots `noindex` a una página, `dist-clean.spec.ts` falla indicando el archivo (se revierte).
 
 - [ ] **T3. Lógica pura del smoke test: primero `scripts/staging/smoke-checks.test.mjs` (tabla de la sección 5 del plan en verde y en rojo, fuentes, favicon, `relativize`, `formatFailure` sin host, `stagingUrl`, `waitForVersion` con reloj inyectado); después `scripts/staging/smoke-checks.mjs`.** RF-13 a RF-27, RF-39, RNF-5
