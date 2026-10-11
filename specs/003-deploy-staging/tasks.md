@@ -19,7 +19,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - Al añadir temporalmente `CLOUDFLARE_API_TOKEN` con el valor `abc` a un archivo versionado de prueba, `pnpm test` falla con archivo y línea (se revierte).
     - Al añadir temporalmente un meta robots `noindex` a una página, `dist-clean.spec.ts` falla indicando el archivo (se revierte).
 
-- [ ] **T3. Lógica pura del smoke test: primero `scripts/staging/smoke-checks.test.mjs` (tabla de la sección 5 del plan en verde y en rojo, fuentes, favicon, `relativize`, `formatFailure` sin host, `stagingUrl`, `waitForVersion` con reloj inyectado); después `scripts/staging/smoke-checks.mjs`.** RF-13 a RF-27, RF-39, RNF-5
+- [x] **T3. Lógica pura del smoke test: primero `scripts/staging/smoke-checks.test.mjs` (tabla de la sección 5 del plan en verde y en rojo, fuentes, favicon, `relativize`, `formatFailure` sin host, `stagingUrl`, `waitForVersion` con reloj inyectado); después `scripts/staging/smoke-checks.mjs`.** RF-13 a RF-27, RF-39, RNF-5
   - Hecho cuando:
     - Los tests pasaron de rojo a verde, incluidos: 404 servida con 200 → rojo; `/en?x=1` sin query en el destino → rojo; sin `X-Robots-Tag` en una 3xx → rojo; título "Centro de Control" → rojo.
     - `waitForVersion` termina en rojo sin superar 180 s de reloj simulado.
