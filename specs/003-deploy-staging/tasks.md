@@ -84,7 +84,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - Al cambiar temporalmente `cancel-in-progress` del despliegue a `true`, añadir `workflow_dispatch`, poner `url` en el entorno o usar `@v7` en una acción, el test falla (se revierte cada vez).
     - `pnpm format:check` acepta el YAML y `no-leaks` sigue en verde.
 
-- [ ] **T9. Documentación: `docs/staging.md` (alta de la sección 7 del plan, con el aviso del subdominio largo y poco común, permiso solo de Workers, caducidad ≤ 12 meses, entorno antes del workflow), `AGENTS.md` raíz (comandos, puerto 8787, regla de despliegue, datos que nunca se versionan), `apps/web/AGENTS.md` (códigos del servidor local, Worker, `.staging/`), `README.md` (CI y entorno de prueba, sin URL) y nota en `MEMORY.md` de la decisión de staging.** RF-38, RP-1, RP-2
+- [x] **T9. Documentación: `docs/staging.md` (alta de la sección 7 del plan, con el aviso del subdominio largo y poco común, permiso solo de Workers, caducidad ≤ 12 meses, entorno antes del workflow), `AGENTS.md` raíz (comandos, puerto 8787, regla de despliegue, datos que nunca se versionan), `apps/web/AGENTS.md` (códigos del servidor local, Worker, `.staging/`), `README.md` (CI y entorno de prueba, sin URL) y nota en `MEMORY.md` de la decisión de staging.** RF-38, RP-1, RP-2
   - Hecho cuando:
     - Las instrucciones siguen el orden de RF-38 y avisan de revisar y restringir el entorno si GitHub lo creó solo.
     - `apps/web/AGENTS.md` y el README describen el servidor local con 307 (`/en`, `/index.html`, `/404.html`) y `/404` con 200 (D17); ya no dicen "`/en` → 308".

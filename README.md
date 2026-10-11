@@ -17,14 +17,14 @@ La mascota de la agencia es **Mac**, un alien que acompaña al visitante por un 
 - **`apps/web` — Web pública.** Carta de presentación de la agencia, en español (idioma principal) e inglés. HTML estático pensado para posicionar: el contenido está en el HTML y las animaciones nunca lo ocultan a los buscadores.
 - **`apps/control` — Centro de Control.** Panel interno (CRM de empresas, clientes y proyectos). No se indexa y, cuando se despliegue, solo será accesible tras Cloudflare Access.
 
-Ahora mismo ambas aplicaciones son esqueletos mínimos: la base técnica (herramientas, tests y auditoría) está lista y el contenido llega en las siguientes fases. Todavía no hay nada desplegado.
+Ahora mismo ambas aplicaciones son esqueletos mínimos: la base técnica (herramientas, tests y auditoría) está lista y el contenido llega en las siguientes fases. Todavía no hay nada en producción; la web pública tiene preparado un entorno de prueba (ver [CI y entorno de prueba](#ci-y-entorno-de-prueba)).
 
 ## Tecnologías
 
 - **Monorepo**: pnpm workspaces y TypeScript.
 - **Web pública**: [Astro](https://astro.build), con GSAP/ScrollTrigger, Lenis y Rive para las animaciones.
 - **Centro de Control**: React + Vite.
-- **Infraestructura prevista**: Cloudflare (Pages/Workers, D1 como base de datos y Access como login) y Resend para los correos.
+- **Infraestructura**: Cloudflare Workers con archivos estáticos (entorno de prueba de la web); previstos D1 como base de datos, Access como login y Resend para los correos. CI en GitHub Actions.
 - **Calidad**: Vitest (lógica), Playwright + axe (flujos end-to-end y accesibilidad), Lighthouse CI (rendimiento, accesibilidad, buenas prácticas y SEO), ESLint y Prettier.
 
 ## Estructura del repositorio
@@ -34,9 +34,11 @@ Ahora mismo ambas aplicaciones son esqueletos mínimos: la base técnica (herram
 ├── apps/
 │   ├── web/          # Web pública (Astro) + configuración de Lighthouse CI
 │   └── control/      # Centro de Control (React + Vite)
+├── .github/workflows/ci.yml  # CI y despliegue al entorno de prueba
 ├── docs/
-│   └── constitution.md   # Principios innegociables del proyecto
-├── scripts/          # Comprobaciones del entorno y servidor de la preview, con sus tests
+│   ├── constitution.md   # Principios innegociables del proyecto
+│   └── staging.md        # Entorno de prueba: alta, CI y comportamiento
+├── scripts/          # Comprobaciones, servidor de la preview y scripts de staging, con sus tests
 ├── specs/            # Especificaciones (Spec-Driven Development): spec, plan y tareas
 ├── AGENTS.md         # Cómo se trabaja en el proyecto (también para agentes de IA)
 ├── MEMORY.md         # Estado del proyecto y decisiones tomadas
@@ -88,8 +90,15 @@ Todos se ejecutan desde la raíz del repositorio.
 | `pnpm test`             | Tests unitarios (Vitest), comprobación del navegador y tests end-to-end (Playwright + axe) |
 | `pnpm quality`          | Compila la web y la audita con Lighthouse CI                                               |
 | `pnpm browsers:install` | Instala o actualiza el Chromium de Playwright                                              |
+| `pnpm smoke`            | Smoke test del entorno de prueba (en local: `--url http://localhost:8787 --version local`) |
 
-`pnpm test` compila y sirve cada aplicación por su cuenta antes de los tests end-to-end. La web usa dos puertos: `pnpm dev:web` (`astro dev`) arranca en el **4321**, y la build de producción que prueban Playwright y Lighthouse se sirve en el **4322** con un pequeño servidor estático propio (`scripts/serve-static.mjs`, sin dependencias), que imita a Cloudflare Pages (página 404 por idioma, distingue mayúsculas y minúsculas) y falla si el puerto está ocupado, así que un servidor de desarrollo abierto nunca se confunde con la build bajo prueba. En local, si ya hay una preview levantada en el 4322 (o la del Centro de Control en el 4173), los tests la reutilizan.
+`pnpm test` compila y sirve cada aplicación por su cuenta antes de los tests end-to-end. La web usa dos puertos: `pnpm dev:web` (`astro dev`) arranca en el **4321**, y la build de producción que prueban Playwright y Lighthouse se sirve en el **4322** con un pequeño servidor estático propio (`scripts/serve-static.mjs`, sin dependencias), que responde igual que Cloudflare Workers: página 404 por idioma, distingue mayúsculas y minúsculas, redirecciones 307 que conservan la query (`/en` → `/en/`, `/index.html` → `/`, `/404.html` → `/404`) y `/404` servida con 200. Falla si el puerto está ocupado, así que un servidor de desarrollo abierto nunca se confunde con la build bajo prueba. En local, si ya hay una preview levantada en el 4322 (o la del Centro de Control en el 4173), los tests la reutilizan.
+
+## CI y entorno de prueba
+
+- **CI** (GitHub Actions, `.github/workflows/ci.yml`): en cada push y cada PR hacia `main` instala con el lockfile congelado, pasa lint y formato, compila las dos apps una sola vez y ejecuta los tests y Lighthouse sobre esa build. Solo tiene permiso de lectura sobre el repositorio.
+- **Entorno de prueba (staging)**: tras cada push a `main` con el CI en verde, la misma build de la web se despliega en un Worker de Cloudflare (`agencymac-staging`) y un smoke test la comprueba. Todas sus respuestas llevan `X-Robots-Tag: noindex`, así que los buscadores no la indexan. La URL no se publica en el repositorio: se consulta en el panel de Cloudflare.
+- El alta inicial (cuenta, token, entorno y secretos), la prueba en local con `wrangler dev` y el comportamiento del Worker están en [`docs/staging.md`](docs/staging.md).
 
 ## Calidad
 
@@ -101,7 +110,8 @@ Todos se ejecutan desde la raíz del repositorio.
 ## Privacidad y configuración local
 
 - La **telemetría de Astro está desactivada** en todos los scripts de la web (`ASTRO_TELEMETRY_DISABLED=1`).
-- El repositorio es público: ninguna clave, token ni archivo `.env` se sube a git. Los archivos `.env*` (salvo `.env.example`) y `.dev.vars` están ignorados.
+- La **telemetría de wrangler está desactivada** en los scripts y en el CI (`WRANGLER_SEND_METRICS=false`).
+- El repositorio es público: ninguna clave, token ni archivo `.env` se sube a git. Los archivos `.env*` (salvo `.env.example`), `.dev.vars` y `.wrangler/` están ignorados, y un test falla si aparece una URL de `workers.dev`, un secreto con valor o uno de esos archivos.
 
 ### MCP para agentes de IA
 

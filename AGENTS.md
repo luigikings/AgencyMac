@@ -7,7 +7,7 @@ Monorepo de AgencyMac (agencia de Marketing, Análisis y Coding). Contiene la we
 - Monorepo con pnpm workspaces. Código en TypeScript.
 - `apps/web`: web pública. Astro + GSAP/ScrollTrigger + Lenis + Rive. Idiomas ES (principal) y EN.
 - `apps/control`: Centro de Control (uso interno). React. Protegido con Cloudflare Access.
-- Infraestructura: Cloudflare (Pages/Workers, D1 como base de datos, Access como login) y Resend (correos).
+- Infraestructura: Cloudflare (Workers con static assets, D1 como base de datos, Access como login) y Resend (correos). CI en GitHub Actions; entorno de prueba en el Worker `agencymac-staging` (`docs/staging.md`).
 - Cada app tiene su propio `AGENTS.md` con sus reglas específicas.
 - Marca: colores, tipografías (Lilita One + Lato), logos e ilustraciones (planetas, Mac) en los assets del proyecto.
 
@@ -23,6 +23,8 @@ Requisitos: Node 24 LTS (`.node-version`) y pnpm (versión fijada en `packageMan
 - Lint: `pnpm lint`
 - Formato: `pnpm format` (corrige) / `pnpm format:check` (comprueba)
 - Build: `pnpm build` (las dos apps)
+- Staging en local: `pnpm --filter web staging:local` (copia de la build + `_headers` en `apps/web/.staging/` y `wrangler dev` en el 8787, sin cuenta ni token; requiere `pnpm --filter web build` antes)
+- Smoke test: `pnpm smoke --url http://localhost:8787 --version local` (en el CI compone la URL con el secreto del subdominio; detalles en `docs/staging.md`)
 - Variables de entorno: si una app las necesita, se añade un `.env.example` con los nombres y sin valores reales. Los `.env` de verdad nunca se versionan.
 
 ## Convenciones
@@ -36,8 +38,10 @@ Requisitos: Node 24 LTS (`.node-version`) y pnpm (versión fijada en `packageMan
 - La mascota es el alien Mac. El CTA principal es "Quiero despegar" (pedir presupuesto).
 - El repo es PÚBLICO: el historial de git también. Ningún secreto ni dato de cliente puede llegar nunca a un commit.
 - Las animaciones nunca deben ocultar contenido a Google: el texto va en el HTML.
-- Puertos fijos: web `astro dev` 4321 y preview de tests/Lighthouse 4322, servida por `scripts/serve-static.mjs`, que imita Cloudflare Pages (404 más cercana por carpeta, distingue mayúsculas/minúsculas) y falla si el puerto está ocupado; control dev 5173 y preview 4173 (con `--strictPort`).
-- En Windows, parar tareas en segundo plano puede dejar procesos node huérfanos ocupando esos puertos: comprobarlos y matarlos antes de lanzar los tests.
+- Puertos fijos: web `astro dev` 4321 y preview de tests/Lighthouse 4322, servida por `scripts/serve-static.mjs`, que imita los static assets de Cloudflare Workers (códigos en `apps/web/AGENTS.md`) y falla si el puerto está ocupado; control dev 5173 y preview 4173 (con `--strictPort`); staging local (`wrangler dev`) 8787.
+- En Windows, parar tareas en segundo plano puede dejar procesos node huérfanos ocupando esos puertos: comprobarlos y matarlos antes de lanzar los tests. Parar `wrangler dev` deja vivo `workerd.exe` en el 8787 (y a veces el propio wrangler, que lo relanza): matar el árbol con `taskkill /PID <pid> /T /F`, solo los procesos de este repo, y comprobar que el puerto queda libre.
+- Staging (spec 003): solo despliega el CI, tras un push a `main` con todo el CI en verde (`.github/workflows/ci.yml`). Ningún agente ejecuta `wrangler login` ni `wrangler deploy`, ni crea cuentas o tokens. La URL de prueba, el subdominio de la cuenta, el Account ID y los tokens nunca se versionan (en la documentación: `agencymac-staging.<subdominio>.workers.dev`); `scripts/no-leaks.test.mjs` lo vigila y `.wrangler/` está ignorado. La telemetría de wrangler está desactivada (`WRANGLER_SEND_METRICS=false`) en los scripts y en el CI.
+- CI: una sola build por ejecución; con `PREBUILT_DIST=1`, Playwright sirve la build existente sin compilar. En local, `pnpm test` y `pnpm quality` siguen compilando por sí mismos.
 
 ## SDD
 
