@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run && node scripts/check-browser.mjs && playwright test",
-    "quality": "node scripts/check-browser.mjs && pnpm --filter web build && pnpm --filter web quality"
+    "quality": "node scripts/check-browser.mjs && pnpm --filter web build && pnpm --filter web quality",
+    "smoke": "node scripts/staging/smoke.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

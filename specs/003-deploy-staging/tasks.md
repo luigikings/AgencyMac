@@ -25,7 +25,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - `waitForVersion` termina en rojo sin superar 180 s de reloj simulado.
     - Ningún mensaje de fallo contiene el host recibido.
 
-- [ ] **T4. Copia de staging, comprobación previa y CLI del smoke test: primero `staging-copy.test.mjs` y `preflight.test.mjs`; después `scripts/staging/staging-copy.mjs`, `scripts/staging/preflight.mjs`, `scripts/staging/smoke.mjs` (CLI fino con `--url` o el secreto del subdominio, `redirect: "manual"`), script raíz `smoke` y scripts `staging:copy` y `staging:deploy` de `apps/web` con `WRANGLER_SEND_METRICS=false`.** RF-4, RF-9, RF-10, RF-11, RF-12, RF-13, RF-37, RF-39
+- [x] **T4. Copia de staging, comprobación previa y CLI del smoke test: primero `staging-copy.test.mjs` y `preflight.test.mjs`; después `scripts/staging/staging-copy.mjs`, `scripts/staging/preflight.mjs`, `scripts/staging/smoke.mjs` (CLI fino con `--url` o el secreto del subdominio, `redirect: "manual"`), script raíz `smoke` y scripts `staging:copy` y `staging:deploy` de `apps/web` con `WRANGLER_SEND_METRICS=false`.** RF-4, RF-9, RF-10, RF-11, RF-12, RF-13, RF-37, RF-39
   - Hecho cuando:
     - Los tests pasaron de rojo a verde: `_headers` exacto, identificador validado, negativa si la build trae `_headers`, `dist` intacta; `preflight` no listo si falta uno, dos o tres secretos o el commit no es la punta, con avisos solo por nombre.
     - `pnpm --filter web staging:copy` (con `local`) crea `apps/web/.staging/` con la build más `_headers`, y `apps/web/dist` no cambia.
