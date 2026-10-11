@@ -10,6 +10,15 @@ const HREFLANG = { es: `${SITE}/`, en: `${SITE}/en/`, "x-default": `${SITE}/` };
 const SITE_NAME = "AgencyMac";
 const CONTROL_TITLE = "Centro de Control";
 const SUBDOMAIN_PATTERN = /^[a-z0-9-]+$/;
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// Titles of the 404 pages (RF-16, RF-17). A test keeps them equal to the
+// website translations (apps/web/src/lib), which this plain script cannot
+// import at run time.
+export const ERROR_TITLES = {
+  es: "Página no encontrada · AgencyMac",
+  en: "Page not found · AgencyMac",
+};
 
 const home = (path, lang, canonical) => ({
   path,
@@ -39,14 +48,32 @@ const redirect = (path, location) => ({
 export const SMOKE_CHECKS = [
   home("/", "es", `${SITE}/`),
   home("/en/", "en", `${SITE}/en/`),
-  notFound("/no-existe/", "es", { noindex: true }),
-  notFound("/no-existe", "es", { noindex: true }),
-  notFound("/en/no-existe/", "en", { noindex: true }),
-  notFound("/en/no-existe", "en", { noindex: true }),
+  notFound("/no-existe/", "es", { noindex: true, errorTitle: ERROR_TITLES.es }),
+  notFound("/no-existe", "es", { noindex: true, errorTitle: ERROR_TITLES.es }),
+  notFound("/en/no-existe/", "en", {
+    noindex: true,
+    errorTitle: ERROR_TITLES.en,
+  }),
+  notFound("/en/no-existe", "en", {
+    noindex: true,
+    errorTitle: ERROR_TITLES.en,
+  }),
   // The error pages requested by their own URL answer 200 (D17).
-  { path: "/404", status: 200, lang: "es", noindex: true },
+  {
+    path: "/404",
+    status: 200,
+    lang: "es",
+    noindex: true,
+    errorTitle: ERROR_TITLES.es,
+  },
   redirect("/404.html", "/404"),
-  { path: "/en/404", status: 200, lang: "en", noindex: true },
+  {
+    path: "/en/404",
+    status: 200,
+    lang: "en",
+    noindex: true,
+    errorTitle: ERROR_TITLES.en,
+  },
   redirect("/en/404.html", "/en/404"),
   redirect("/index.html", "/"),
   redirect("/en/index.html", "/en/"),
@@ -143,6 +170,14 @@ export function evaluateResponse(check, response, { baseUrl }) {
       if (lang !== check.lang) expect(`lang "${check.lang}"`, quoted(lang));
     }
 
+    // RF-16, RF-17: the error page itself, not another page with the status.
+    if (check.errorTitle) {
+      const title = htmlTitle(body);
+      if (title !== check.errorTitle) {
+        expect(`title "${check.errorTitle}"`, quoted(title));
+      }
+    }
+
     if (check.notControl) {
       const title = htmlTitle(body);
       if (
@@ -234,9 +269,11 @@ export function stagingUrl(worker, subdomain) {
   return `https://${worker}.${subdomain}.workers.dev`;
 }
 
-// Retries until the X-Staging-Version header equals the expected id, never
-// starting an attempt after limitMs (RF-14). A network error counts as
-// "no version yet".
+// Retries until the X-Staging-Version header equals the expected id (RF-14).
+// No attempt can go past limitMs: each request gets a timeout of
+// min(requestTimeoutMs, time left), passed to fetchVersion({ timeoutMs }),
+// and no attempt starts once the time is up. A network error or timeout
+// counts as "no version yet".
 export async function waitForVersion({
   fetchVersion,
   expected,
@@ -244,26 +281,30 @@ export async function waitForVersion({
   sleep,
   limitMs = 180_000,
   intervalMs = 10_000,
+  requestTimeoutMs = REQUEST_TIMEOUT_MS,
 }) {
   const start = now();
+  let got = null;
+  const giveUp = () => ({
+    ok: false,
+    failure: formatFailure({
+      path: "/",
+      expected: `X-Staging-Version ${expected}`,
+      actual: got ?? "(none)",
+    }),
+  });
   for (;;) {
-    let got = null;
+    const remaining = limitMs - (now() - start);
+    if (remaining <= 0) return giveUp();
     try {
-      got = await fetchVersion();
+      got = await fetchVersion({
+        timeoutMs: Math.min(requestTimeoutMs, remaining),
+      });
     } catch {
       got = null;
     }
     if (got === expected) return { ok: true };
-    if (now() - start + intervalMs > limitMs) {
-      return {
-        ok: false,
-        failure: formatFailure({
-          path: "/",
-          expected: `X-Staging-Version ${expected}`,
-          actual: got ?? "(none)",
-        }),
-      };
-    }
+    if (now() - start + intervalMs > limitMs) return giveUp();
     await sleep(intervalMs);
   }
 }

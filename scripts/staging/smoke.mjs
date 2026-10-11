@@ -46,10 +46,10 @@ function resolveBaseUrl(url, env) {
   );
 }
 
-async function request(url) {
+async function request(url, timeoutMs = REQUEST_TIMEOUT_MS) {
   const response = await fetch(url, {
     redirect: "manual",
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return {
     status: response.status,
@@ -86,13 +86,15 @@ export async function runSmoke({ baseUrl, version, log = console.log }) {
   };
 
   const versionResult = await waitForVersion({
-    fetchVersion: async () =>
-      (await request(new URL("/", baseUrl).href)).headers.get(
+    // timeoutMs = min(15 s, time left), so the wait never passes 180 s.
+    fetchVersion: async ({ timeoutMs }) =>
+      (await request(new URL("/", baseUrl).href, timeoutMs)).headers.get(
         "x-staging-version",
       ),
     expected: version,
     now: () => Date.now(),
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
   });
   // A version mismatch is a failure, but the other checks still run so the
   // log shows everything that differs.

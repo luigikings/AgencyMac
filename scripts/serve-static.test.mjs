@@ -86,7 +86,7 @@ describe("resolveRequest", () => {
     },
   );
 
-  it.each(["/EN/", "/En/", "/EN", "/En/index.html"])(
+  it.each(["/EN/", "/En/", "/EN", "/En/index.html", "/Favicon.svg"])(
     "is case-sensitive: %s gets the Spanish 404",
     (pathname) => {
       expect(resolve(pathname)).toEqual({ status: 404, file: "404.html" });

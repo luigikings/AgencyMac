@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { t } from "../../apps/web/src/lib/i18n.ts";
+import { SITE_NAME, buildPageTitle } from "../../apps/web/src/lib/site.ts";
 import {
+  ERROR_TITLES,
   SMOKE_CHECKS,
   evaluateResponse,
   extractFaviconUrl,
@@ -40,6 +43,9 @@ function page({
 
 const html = { "content-type": "text/html; charset=utf-8" };
 const noindex = { "x-robots-tag": "noindex" };
+// Titles of the error pages, straight from the website translations.
+const ES_ERROR = buildPageTitle(SITE_NAME, t("es", "notFound.title"));
+const EN_ERROR = buildPageTitle(SITE_NAME, t("en", "notFound.title"));
 
 // A response that satisfies a check, built from the check itself.
 function goodResponse(check) {
@@ -57,9 +63,33 @@ function goodResponse(check) {
   }
   const body = check.contentType
     ? "binary"
-    : page({ lang: check.lang ?? "es", canonical: check.canonical });
+    : page({
+        lang: check.lang ?? "es",
+        canonical: check.canonical,
+        ...(check.errorTitle ? { title: check.errorTitle } : {}),
+      });
   return { status: check.status, headers, body };
 }
+
+describe("ERROR_TITLES", () => {
+  it("match the titles of the 404 pages in the translations", () => {
+    expect(ERROR_TITLES).toEqual({ es: ES_ERROR, en: EN_ERROR });
+  });
+
+  // RF-16, RF-17: the error pages are checked by their content (title).
+  it.each([
+    ["/no-existe/", ES_ERROR],
+    ["/no-existe", ES_ERROR],
+    ["/en/no-existe/", EN_ERROR],
+    ["/en/no-existe", EN_ERROR],
+    ["/404", ES_ERROR],
+    ["/en/404", EN_ERROR],
+  ])("%s expects the error page title", (path, title) => {
+    expect(SMOKE_CHECKS.find((check) => check.path === path).errorTitle).toBe(
+      title,
+    );
+  });
+});
 
 const checkFor = (path) => SMOKE_CHECKS.find((check) => check.path === path);
 
@@ -154,16 +184,38 @@ describe("evaluateResponse — failures", () => {
     const failures = fail("/no-existe/", {
       status: 200,
       headers: { ...html, ...noindex },
-      body: page({ lang: "es" }),
+      body: page({ lang: "es", title: ES_ERROR }),
     });
     expect(failures).toEqual(["/no-existe/: expected status 404, got 200"]);
+  });
+
+  it("fails when a 404 serves another page instead of the error page", () => {
+    const failures = fail("/no-existe/", {
+      status: 404,
+      headers: { ...html, ...noindex },
+      body: page({ lang: "es" }),
+    });
+    expect(failures).toEqual([
+      `/no-existe/: expected title "${ES_ERROR}", got "Agencia de diseño web · AgencyMac"`,
+    ]);
+  });
+
+  it("fails when /404 serves the home page with 200", () => {
+    const failures = fail("/404", {
+      status: 200,
+      headers: { ...html, ...noindex },
+      body: page({ lang: "es" }),
+    });
+    expect(failures).toEqual([
+      `/404: expected title "${ES_ERROR}", got "Agencia de diseño web · AgencyMac"`,
+    ]);
   });
 
   it("fails when /404 answers 404 instead of 200", () => {
     const failures = fail("/404", {
       status: 404,
       headers: { ...html, ...noindex },
-      body: page({ lang: "es" }),
+      body: page({ lang: "es", title: ES_ERROR }),
     });
     expect(failures).toEqual(["/404: expected status 200, got 404"]);
   });
@@ -172,9 +224,12 @@ describe("evaluateResponse — failures", () => {
     const failures = fail("/en/404", {
       status: 200,
       headers: { ...html, ...noindex },
-      body: page({ lang: "es" }),
+      body: page({ lang: "es", title: ES_ERROR }),
     });
-    expect(failures).toEqual(['/en/404: expected lang "en", got "es"']);
+    expect(failures).toEqual([
+      '/en/404: expected lang "en", got "es"',
+      `/en/404: expected title "${EN_ERROR}", got "${ES_ERROR}"`,
+    ]);
   });
 
   it("fails when /404.html is served instead of redirected", () => {
@@ -199,7 +254,7 @@ describe("evaluateResponse — failures", () => {
     const failures = fail("/en/no-existe/", {
       status: 404,
       headers: { ...html, ...noindex },
-      body: page({ lang: "es" }),
+      body: page({ lang: "es", title: EN_ERROR }),
     });
     expect(failures).toEqual(['/en/no-existe/: expected lang "en", got "es"']);
   });
@@ -527,7 +582,8 @@ describe("waitForVersion", () => {
     );
     expect(clock.now()).toBeLessThanOrEqual(180_000);
     expect(clock.now()).toBe(180_000);
-    expect(source.calls()).toBe(19);
+    // Attempts at 0, 10, ..., 170 s; at 180 s there is no time left.
+    expect(source.calls()).toBe(18);
   });
 
   it("reports (none) when the header never appears", async () => {
@@ -573,5 +629,46 @@ describe("waitForVersion", () => {
     expect(result.ok).toBe(false);
     expect(Math.max(...starts)).toBeLessThanOrEqual(180_000);
     expect(starts.length).toBeGreaterThan(1);
+  });
+
+  it("caps each request at 15 s or the time left, so no attempt ends past 180 s", async () => {
+    let time = 0;
+    const timeouts = [];
+    const result = await waitForVersion({
+      now: () => time,
+      sleep: async (ms) => {
+        time += ms;
+      },
+      // A request that hangs until its timeout aborts it.
+      fetchVersion: async ({ timeoutMs }) => {
+        timeouts.push(timeoutMs);
+        time += timeoutMs;
+        throw new Error("TimeoutError");
+      },
+      expected: SHA,
+    });
+    expect(result.ok).toBe(false);
+    expect(time).toBeLessThanOrEqual(180_000);
+    expect(Math.max(...timeouts)).toBe(15_000);
+    expect(timeouts.at(-1)).toBe(5_000);
+    expect(timeouts.every((ms) => ms > 0)).toBe(true);
+  });
+
+  it("accepts a custom request timeout", async () => {
+    const timeouts = [];
+    let time = 0;
+    await waitForVersion({
+      now: () => time,
+      sleep: async (ms) => {
+        time += ms;
+      },
+      fetchVersion: async ({ timeoutMs }) => {
+        timeouts.push(timeoutMs);
+        return SHA;
+      },
+      expected: SHA,
+      requestTimeoutMs: 3_000,
+    });
+    expect(timeouts).toEqual([3_000]);
   });
 });
