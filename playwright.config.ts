@@ -1,6 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
+// Spec 003 (RF-11, P7): the CI builds once and sets PREBUILT_DIST=1 so the
+// web servers only serve that build. Locally (no variable) they build first.
+const prebuilt = process.env.PREBUILT_DIST === "1";
+const serve = (app: string) =>
+  prebuilt
+    ? `pnpm --filter ${app} preview`
+    : `pnpm --filter ${app} build && pnpm --filter ${app} preview`;
 
 // Shared Playwright configuration: Chromium only (Playwright's own build,
 // shared with Lighthouse CI). Each app has its own project and webServer
@@ -27,13 +34,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter web build && pnpm --filter web preview",
+      command: serve("web"),
       url: "http://localhost:4322",
       reuseExistingServer: !isCI,
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter control build && pnpm --filter control preview",
+      command: serve("control"),
       url: "http://localhost:4173",
       reuseExistingServer: !isCI,
       timeout: 120_000,

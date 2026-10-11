@@ -35,7 +35,11 @@ module.exports = {
       url: ["http://localhost:4322/", "http://localhost:4322/en/"],
       numberOfRuns: 3,
       chromePath,
-      settings: { chromeFlags: "--headless" },
+      // In CI (Ubuntu 24.04 restricts unprivileged sandboxes) Chromium needs
+      // --no-sandbox; locally the flags stay as they were (spec 003, P10).
+      settings: {
+        chromeFlags: process.env.CI ? "--headless --no-sandbox" : "--headless",
+      },
     },
     assert: {
       assertions: {

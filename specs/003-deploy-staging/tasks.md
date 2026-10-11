@@ -72,7 +72,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - `pnpm smoke --url http://localhost:4322 --version local` solo falla en la versión y en el noindex (que el servidor local no añade), nada más.
     - `pnpm test` y `pnpm quality` en verde.
 
-- [ ] **T7. Una sola build en el CI: primero un test en `ci-workflow.test.mjs` o en un test de configuración que compruebe que, con `PREBUILT_DIST=1`, los `webServer` de `playwright.config.ts` no compilan; después `playwright.config.ts` y `--no-sandbox` condicionado a `CI` en `apps/web/lighthouserc.cjs`.** RF-11, RF-28, RNF-9
+- [x] **T7. Una sola build en el CI: primero un test en `ci-workflow.test.mjs` o en un test de configuración que compruebe que, con `PREBUILT_DIST=1`, los `webServer` de `playwright.config.ts` no compilan; después `playwright.config.ts` y `--no-sandbox` condicionado a `CI` en `apps/web/lighthouserc.cjs`.** RF-11, RF-28, RNF-9
   - Hecho cuando:
     - El test pasó de rojo a verde.
     - En local, `pnpm test` y `pnpm quality` sin la variable siguen compilando y en verde.
