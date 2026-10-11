@@ -1,0 +1,149 @@
+# CI and staging deploy of AgencyMac (spec 003).
+# - check: every push and PR to main. One build of both apps, then tests and
+#   Lighthouse on that same build. On push, the web build is kept as an
+#   artifact for the deploy job.
+# - deploy: only on push to main after a green check. Copies that build,
+#   adds the staging headers file (noindex + version), deploys the Worker and
+#   runs the smoke test. It is skipped with a warning if a secret is missing
+#   or the commit is no longer the tip of main.
+# The staging URL is never written here: it is built from a secret.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, build, test and audit
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: check-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
+    env:
+      CI: true
+      ASTRO_TELEMETRY_DISABLED: 1
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (version from .node-version)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+
+      - name: Enable pnpm with corepack and print versions
+        run: |
+          corepack enable
+          node --version
+          pnpm --version
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium and its system dependencies
+        run: pnpm browsers:install --with-deps
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Build both apps (the only build of this run)
+        run: pnpm build
+
+      - name: Test on that build
+        run: pnpm test
+        env:
+          PREBUILT_DIST: "1"
+
+      - name: Lighthouse on that build
+        run: node scripts/check-browser.mjs && pnpm --filter web quality
+
+      - name: Keep the web build for the deploy job
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to staging
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    env:
+      WRANGLER_SEND_METRICS: false
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pre-deploy check (secrets present, commit is the tip of main)
+        id: preflight
+        run: node scripts/staging/preflight.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_WORKERS_SUBDOMAIN: ${{ secrets.CF_WORKERS_SUBDOMAIN }}
+
+      - name: Set up Node (version from .node-version)
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+
+      - name: Enable pnpm with corepack
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          corepack enable
+          node --version
+          pnpm --version
+
+      - name: Install dependencies (frozen lockfile)
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Get the web build of the check job
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      - name: Prepare the staging copy (build + headers file)
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm --filter web staging:copy
+        env:
+          VERSION: ${{ github.sha }}
+
+      - name: Deploy the staging Worker
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm --filter web staging:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_WORKERS_SUBDOMAIN: ${{ secrets.CF_WORKERS_SUBDOMAIN }}
+
+      - name: Smoke test of staging
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm smoke --version ${{ github.sha }}
+        env:
+          CF_WORKERS_SUBDOMAIN: ${{ secrets.CF_WORKERS_SUBDOMAIN }}

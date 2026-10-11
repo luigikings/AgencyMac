@@ -78,7 +78,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - En local, `pnpm test` y `pnpm quality` sin la variable siguen compilando y en verde.
     - Con `pnpm build` previo y `PREBUILT_DIST=1`, `pnpm test` no vuelve a compilar (el registro no muestra `astro build` ni `vite build`) y queda en verde.
 
-- [ ] **T8. Workflow: primero el resto de `scripts/ci-workflow.test.mjs` (sección 8 del plan); después `.github/workflows/ci.yml` (sección 3 del plan, acciones fijadas por SHA con la versión en comentario).** RF-1 a RF-6, RF-10, RF-11, RF-12, RF-28 a RF-35, RF-37, RF-39, RF-40, RNF-3
+- [x] **T8. Workflow: primero el resto de `scripts/ci-workflow.test.mjs` (sección 8 del plan); después `.github/workflows/ci.yml` (sección 3 del plan, acciones fijadas por SHA con la versión en comentario).** RF-1 a RF-6, RF-10, RF-11, RF-12, RF-28 a RF-35, RF-37, RF-39, RF-40, RNF-3
   - Hecho cuando:
     - Los tests pasaron de rojo a verde.
     - Al cambiar temporalmente `cancel-in-progress` del despliegue a `true`, añadir `workflow_dispatch`, poner `url` en el entorno o usar `@v7` en una acción, el test falla (se revierte cada vez).
