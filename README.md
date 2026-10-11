@@ -36,7 +36,7 @@ Ahora mismo ambas aplicaciones son esqueletos mínimos: la base técnica (herram
 │   └── control/      # Centro de Control (React + Vite)
 ├── docs/
 │   └── constitution.md   # Principios innegociables del proyecto
-├── scripts/          # Comprobaciones del entorno (Node, pnpm, navegador) con sus tests
+├── scripts/          # Comprobaciones del entorno y servidor de la preview, con sus tests
 ├── specs/            # Especificaciones (Spec-Driven Development): spec, plan y tareas
 ├── AGENTS.md         # Cómo se trabaja en el proyecto (también para agentes de IA)
 ├── MEMORY.md         # Estado del proyecto y decisiones tomadas
@@ -89,7 +89,7 @@ Todos se ejecutan desde la raíz del repositorio.
 | `pnpm quality`          | Compila la web y la audita con Lighthouse CI                                               |
 | `pnpm browsers:install` | Instala o actualiza el Chromium de Playwright                                              |
 
-`pnpm test` compila y sirve cada aplicación por su cuenta antes de los tests end-to-end. La web usa dos puertos: `pnpm dev:web` (`astro dev`) arranca en el **4321**, y la build de producción que prueban Playwright y Lighthouse se sirve en el **4322** (`--strictPort`), así que un servidor de desarrollo abierto nunca se confunde con la build bajo prueba. En local, si ya hay una preview levantada en el 4322 (o la del Centro de Control en el 4173), los tests la reutilizan.
+`pnpm test` compila y sirve cada aplicación por su cuenta antes de los tests end-to-end. La web usa dos puertos: `pnpm dev:web` (`astro dev`) arranca en el **4321**, y la build de producción que prueban Playwright y Lighthouse se sirve en el **4322** con un pequeño servidor estático propio (`scripts/serve-static.mjs`, sin dependencias), que imita a Cloudflare Pages (página 404 por idioma, distingue mayúsculas y minúsculas) y falla si el puerto está ocupado, así que un servidor de desarrollo abierto nunca se confunde con la build bajo prueba. En local, si ya hay una preview levantada en el 4322 (o la del Centro de Control en el 4173), los tests la reutilizan.
 
 ## Calidad
 

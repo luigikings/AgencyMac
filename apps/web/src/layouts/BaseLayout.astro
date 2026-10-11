@@ -1,0 +1,121 @@
+---
+import { Font } from "astro:assets";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import type { Locale } from "../lib/i18n";
+import { SITE_NAME, buildPageTitle } from "../lib/site";
+import { alternateLinks, canonicalUrl } from "../lib/seo";
+import { colors, fontPreloads, fonts, tokensToCss } from "../styles/tokens";
+
+interface Props {
+  locale: Locale;
+  /** Page title, already translated (the site name is appended here). */
+  title: string;
+  /** Meta description, already translated. */
+  description: string;
+  /** Indexable page: its path; `null` for pages without canonical/hreflang (404). */
+  seo: { path: string } | null;
+  /** Show the link to the other language in the header (false on the 404s). */
+  showLanguageSwitch?: boolean;
+}
+
+const {
+  locale,
+  title,
+  description,
+  seo,
+  showLanguageSwitch = true,
+} = Astro.props;
+
+if (!Astro.site) {
+  throw new Error("`site` must be set in astro.config.mjs");
+}
+const site = Astro.site;
+const canonical = seo ? canonicalUrl(site, seo.path) : null;
+const alternates = seo ? alternateLinks(site, seo.path) : [];
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{buildPageTitle(SITE_NAME, title)}</title>
+    <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    {alternates.map(({ hreflang, href }) => (
+      <link rel="alternate" hreflang={hreflang} href={href} />
+    ))}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {/* RF-18/RF-19: self-hosted @font-face (swap) + metric-adjusted fallbacks. */}
+    <Font
+      cssVariable={fonts.heading.cssVariable}
+      preload={fontPreloads(fonts.heading)}
+    />
+    <Font
+      cssVariable={fonts.body.cssVariable}
+      preload={fontPreloads(fonts.body)}
+    />
+    <style is:inline set:html={tokensToCss(colors)} />
+  </head>
+  <body>
+    <SiteHeader locale={locale} showLanguageSwitch={showLanguageSwitch} />
+    <main id="content">
+      <slot />
+    </main>
+    <SiteFooter locale={locale} />
+  </body>
+</html>
+
+<style is:global>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  :root {
+    color-scheme: dark;
+  }
+
+  /* Column layout: main grows so the footer sits at the bottom of the
+     window on short pages (100vh is the fallback for browsers without dvh). */
+  body {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+  }
+
+  main {
+    flex: 1 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  h1,
+  h2 {
+    /* Lilita One has a single weight (400): avoid a synthetic bold. */
+    font-family: var(--font-heading);
+    font-weight: 400;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 8vw, 4rem);
+  }
+
+  a {
+    color: var(--color-accent-green);
+  }
+
+  /* RF-21: visible keyboard focus, AA non-text contrast on the purple backgrounds. */
+  :focus-visible {
+    outline: 3px solid var(--color-button-hover);
+    outline-offset: 2px;
+  }
+</style>

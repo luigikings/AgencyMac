@@ -36,7 +36,7 @@ Requisitos: Node 24 LTS (`.node-version`) y pnpm (versión fijada en `packageMan
 - La mascota es el alien Mac. El CTA principal es "Quiero despegar" (pedir presupuesto).
 - El repo es PÚBLICO: el historial de git también. Ningún secreto ni dato de cliente puede llegar nunca a un commit.
 - Las animaciones nunca deben ocultar contenido a Google: el texto va en el HTML.
-- Puertos fijos: web `astro dev` 4321 y preview de tests/Lighthouse 4322 (con `--strictPort`); control dev 5173 y preview 4173.
+- Puertos fijos: web `astro dev` 4321 y preview de tests/Lighthouse 4322, servida por `scripts/serve-static.mjs`, que imita Cloudflare Pages (404 más cercana por carpeta, distingue mayúsculas/minúsculas) y falla si el puerto está ocupado; control dev 5173 y preview 4173 (con `--strictPort`).
 - En Windows, parar tareas en segundo plano puede dejar procesos node huérfanos ocupando esos puertos: comprobarlos y matarlos antes de lanzar los tests.
 
 ## SDD

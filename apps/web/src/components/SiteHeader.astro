@@ -1,0 +1,101 @@
+---
+import { localizePath, otherLocale, t, type Locale } from "../lib/i18n";
+import { SITE_NAME } from "../lib/site";
+
+interface Props {
+  locale: Locale;
+  /**
+   * Link to the same page in the other language. False on the 404s, where
+   * the nav (which only holds that link) is not rendered at all.
+   */
+  showLanguageSwitch: boolean;
+}
+
+const { locale, showLanguageSwitch } = Astro.props;
+const target = otherLocale(locale);
+---
+
+<header class="site-header">
+  <a class="skip-link" href="#content">
+    {t(locale, "a11y.skipToContent")}
+  </a>
+  <div class="site-header__inner">
+    <a
+      class="site-header__brand"
+      href={localizePath(locale, "/")}
+      aria-label={t(locale, "nav.home")}
+    >
+      {SITE_NAME}
+    </a>
+    {
+      /* The language link is the only nav entry for now. Without it (404s)
+         no empty navigation landmark is rendered: the brand link and the
+         page's own link already lead home. */
+      showLanguageSwitch && (
+        <nav aria-label={t(locale, "nav.label")}>
+          <ul class="site-header__links">
+            <li>
+              <a
+                href={localizePath(target, "/")}
+                hreflang={target}
+                lang={target}
+              >
+                {t(locale, "nav.switchLanguage")}
+              </a>
+            </li>
+          </ul>
+        </nav>
+      )
+    }
+  </div>
+</header>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .site-header {
+    background: var(--color-bg-dark);
+  }
+
+  .site-header__inner {
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+
+  .site-header__brand {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .site-header__links {
+    display: flex;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Hidden until it receives keyboard focus. */
+  .skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 1;
+    padding: 0.5rem 1rem;
+    background: var(--color-bg-dark);
+    color: var(--color-text);
+    transform: translateY(-200%);
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+</style>

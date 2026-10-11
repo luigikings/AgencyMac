@@ -1,0 +1,17 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import NotFoundContent from "../components/NotFoundContent.astro";
+import { t, type Locale } from "../lib/i18n";
+
+const locale: Locale = "es";
+---
+
+<BaseLayout
+  locale={locale}
+  title={t(locale, "notFound.title")}
+  description={t(locale, "notFound.description")}
+  seo={null}
+  showLanguageSwitch={false}
+>
+  <NotFoundContent locale={locale} />
+</BaseLayout>

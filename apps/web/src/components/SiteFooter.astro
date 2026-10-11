@@ -1,0 +1,27 @@
+---
+import { t, type Locale } from "../lib/i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<footer class="site-footer">
+  <p class="site-footer__inner">{t(locale, "footer.text")}</p>
+</footer>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .site-footer {
+    background: var(--color-bg-dark);
+  }
+
+  .site-footer__inner {
+    box-sizing: border-box;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+  }
+</style>

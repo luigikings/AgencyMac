@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import HomeContent from "../../components/HomeContent.astro";
+import { localizePath, t, type Locale } from "../../lib/i18n";
+
+const locale: Locale = "en";
+---
+
+<BaseLayout
+  locale={locale}
+  title={t(locale, "home.title")}
+  description={t(locale, "home.description")}
+  seo={{ path: localizePath(locale, "/") }}
+>
+  <HomeContent locale={locale} />
+</BaseLayout>

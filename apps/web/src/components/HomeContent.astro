@@ -1,0 +1,16 @@
+---
+import { t, type Locale } from "../lib/i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<h1>{t(locale, "home.heading")}</h1>
+<p>{t(locale, "home.intro")}</p>
+<section aria-labelledby="home-section-heading">
+  <h2 id="home-section-heading">{t(locale, "home.sectionHeading")}</h2>
+  <p>{t(locale, "home.sectionBody")}</p>
+</section>

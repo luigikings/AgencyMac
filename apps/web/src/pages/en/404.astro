@@ -1,0 +1,19 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import NotFoundContent from "../../components/NotFoundContent.astro";
+import { t, type Locale } from "../../lib/i18n";
+
+// Built as "en/404/index.html"; the relocateNotFound integration in
+// astro.config.mjs moves it to "en/404.html", where hosting looks for it.
+const locale: Locale = "en";
+---
+
+<BaseLayout
+  locale={locale}
+  title={t(locale, "notFound.title")}
+  description={t(locale, "notFound.description")}
+  seo={null}
+  showLanguageSwitch={false}
+>
+  <NotFoundContent locale={locale} />
+</BaseLayout>

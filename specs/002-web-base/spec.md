@@ -1,6 +1,6 @@
 # Spec 002 — Esqueleto de la web pública
 
-Estado: aprobada
+Estado: implementada
 
 Depende de: spec 001 (base del monorepo). No se empieza hasta que 001 esté implementada.
 
@@ -66,7 +66,7 @@ Cada RF indica cómo se verifica. Los tests en navegador se ejecutan contra la b
 
 ### Marca
 
-- RF-16: EL SISTEMA define los colores de la marca como tokens con nombre y papel: #1D003F fondo oscuro, #34006F fondo; #FFC300 botón y #FFE000 botón en hover/foco; #FF9D00, #FF6700, #FF5733 y #C70039 degradado del logo; #DAF7A6 acento verde claro; #00E5FF cian del logo (provisional). _Verifica: Vitest sobre los tokens._
+- RF-16: EL SISTEMA define los colores de la marca como tokens con nombre y papel: #1D003F fondo oscuro, #34006F fondo; #FFC300 botón y #FFE000 botón en hover/foco; #FF9D00, #FF6700, #FF5733 y #C70039 degradado del logo; #DAF7A6 acento verde claro; #00E5FF cian del logo (provisional); y el neutro #FFFFFF texto sobre fondos oscuros. _Verifica: Vitest sobre los tokens._
 - RF-17: SI aparece un color hexadecimal en los estilos o componentes de la web fuera del archivo de tokens, ENTONCES EL SISTEMA hace fallar los tests indicando el archivo. _Verifica: Vitest._
 - RF-18: EL SISTEMA usa Lilita One 400 para los títulos y Lato 400 y 700 (sin cursiva) para el cuerpo, servidas en woff2 desde el propio sitio, sin peticiones a servicios externos de fuentes. _Verifica: Playwright comprobando que no hay peticiones de fuentes a otros dominios._
 - RF-19: MIENTRAS cargan las tipografías de marca, EL SISTEMA muestra el texto con una fuente de respaldo, sin dejarlo invisible. _Verifica: auditoría `font-display` de Lighthouse en verde._
@@ -124,6 +124,8 @@ Cada RF indica cómo se verifica. Los tests en navegador se ejecutan contra la b
 - Revisión visual en escritorio y a 375 px de inicio y 404, en ES y EN.
 - Entregables E-1 a E-3 revisados.
 
+Cierre (2026-10-11): validación con VEREDICTO: APROBADO (todos los RF, RNF y E-1 a E-3). Vitest 167 tests, Playwright 64 tests y Lighthouse 100 en las 4 categorías en `/` y `/en/` (LCP ≈1,05 s, CLS 0), en verde. Pendientes del usuario las comprobaciones manuales: RF-21 (recorrido con Tab) y RF-23 (revisión visual).
+
 ## Decisiones de clarificación (para el plan)
 
 - URLs: ES en `/`, EN en `/en/`, con barra final; `x-default` → ES; URL base `https://agencymac.com` también en local (RF-1, RF-2, RF-12, RF-13).
@@ -137,3 +139,7 @@ Cada RF indica cómo se verifica. Los tests en navegador se ejecutan contra la b
 ## Dudas abiertas
 
 - Ninguna.
+
+## Notas de cambios
+
+- 2026-10-11: RF-16 añade el token neutro #FFFFFF (texto sobre fondos oscuros), aprobado por el usuario durante el plan. Ninguna otra spec definía un color de texto, y RF-17 prohíbe escribir colores hex fuera de los tokens. La spec sigue aprobada.

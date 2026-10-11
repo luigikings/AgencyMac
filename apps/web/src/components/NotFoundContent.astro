@@ -1,0 +1,15 @@
+---
+import { localizePath, t, type Locale } from "../lib/i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<h1>{t(locale, "notFound.heading")}</h1>
+<p>{t(locale, "notFound.message")}</p>
+<p>
+  <a href={localizePath(locale, "/")}>{t(locale, "notFound.backHome")}</a>
+</p>

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
-    "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview --port 4322 --strictPort",
+    "preview": "node ../../scripts/serve-static.mjs --dir dist --port 4322",
     "quality": "lhci autorun"
   },
   "devDependencies": {
