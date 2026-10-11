@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+.astro/
+
+# Test and audit reports
+test-results/
+playwright-report/
+.lighthouseci/
+
+# Environment variables and secrets (only .env.example may be committed)
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# Local-only settings and private notes
+.claude/settings.local.json
+MEMORY.local.md
+
+# Lockfiles of other package managers (this repo uses pnpm only)
+package-lock.json
+yarn.lock

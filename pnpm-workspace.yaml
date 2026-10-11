@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+
+# Run package scripts with pnpm's portable shell so `VAR=value cmd` works the
+# same on Windows (cmd) and Linux (sh) without extra dependencies.
+shellEmulator: true
+# Refuse to install when the running Node does not match `engines` (Node 24).
+engineStrict: true

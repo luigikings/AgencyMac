@@ -1,0 +1,38 @@
+{
+  "name": "agencymac",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "preinstall": "node scripts/check-env.mjs",
+    "browsers:install": "playwright install chromium",
+    "dev:web": "pnpm --filter web dev",
+    "dev:control": "pnpm --filter control dev",
+    "build": "pnpm -r build",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run && node scripts/check-browser.mjs && playwright test",
+    "quality": "node scripts/check-browser.mjs && pnpm --filter web build && pnpm --filter web quality"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.64.0",
+    "@types/node": "24.19.1",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-astro": "1.7.0",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "prettier-plugin-astro": "1.1.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}

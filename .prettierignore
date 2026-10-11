@@ -1,0 +1,11 @@
+# Lockfile (managed by pnpm)
+pnpm-lock.yaml
+
+# Builds
+dist/
+.astro/
+
+# Test and audit reports
+test-results/
+playwright-report/
+.lighthouseci/
