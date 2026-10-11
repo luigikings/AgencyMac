@@ -25,9 +25,10 @@ test.describe("Locale routing without JavaScript", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
   });
 
-  test("/en answers with a permanent redirect to /en/", async ({ request }) => {
+  // Spec 003, D17: 307, the code Cloudflare uses.
+  test("/en answers with a 307 redirect to /en/", async ({ request }) => {
     const response = await request.get("/en", { maxRedirects: 0 });
-    expect(response.status()).toBe(308);
+    expect(response.status()).toBe(307);
     expect(response.headers()["location"]).toBe("/en/");
   });
 });

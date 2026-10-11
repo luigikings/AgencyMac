@@ -1,8 +1,11 @@
 // Static server for the production build of the public website (spec 002,
 // decision P3). It replaces `astro preview`, which always serves the root
-// dist/404.html. It mimics Cloudflare Pages: nearest 404.html walking up the
-// folders, case-sensitive paths (even on Windows' case-insensitive disk) and
-// a 308 redirect to the trailing-slash URL of a folder (/en → /en/).
+// dist/404.html. It mimics Cloudflare (Workers static assets with
+// html_handling "auto-trailing-slash", the codes observed with wrangler dev in
+// spec 003, D17): nearest 404.html walking up the folders, case-sensitive
+// paths (even on Windows' case-insensitive disk), 307 redirects that keep the
+// query (/en → /en/, /index.html → /, /404.html → /404), /404 and /en/404
+// served with 200, and _headers/_redirects never served.
 // No dependencies: node:http, node:fs and node:zlib only.
 //
 // Usage: node scripts/serve-static.mjs --dir dist --port 4322
@@ -83,27 +86,58 @@ function notFound(path, files) {
   return { status: 404, file: null };
 }
 
+// Hosting rule files at the root are configuration, never content.
+const HIDDEN_FILES = new Set(["_headers", "_redirects"]);
+
 /**
  * Decides how to answer a request. Pure: `files` is a Set of the exact-case
  * POSIX paths (relative to the build folder) that exist.
- * Returns { status: 200|404, file } or { status: 308, location }.
+ * Returns { status: 200|404, file } or { status: 307, location }.
+ *
+ * Same behaviour as Cloudflare's assets with html_handling
+ * "auto-trailing-slash" (observed with wrangler dev, spec 003 D17):
+ * - "/dir/" serves dir/index.html; "/dir" → 307 "/dir/".
+ * - "/dir/index.html" and "/dir/index" → 307 "/dir/".
+ * - "/name" serves name.html with 200 (also "/404": the error page by its
+ *   own URL); "/name.html" → 307 "/name"; "/name/" → 307 "/name".
+ * - Redirects keep the query string; anything else gets the nearest 404.
  */
-export function resolveRequest({ pathname, search, files }) {
+export function resolveRequest({ pathname, search, files: allFiles }) {
   const path = safeDecode(pathname);
-  if (path === null || isUnsafe(path)) return notFound("/", files);
+  if (path === null || isUnsafe(path)) return notFound("/", allFiles);
 
+  const files = {
+    has: (rel) => allFiles.has(rel) && !HIDDEN_FILES.has(rel),
+  };
+  const query = search ?? "";
+  const redirect = (location) => ({ status: 307, location: location + query });
   const rel = path.slice(1);
+
   if (path.endsWith("/")) {
     if (files.has(rel + INDEX_PAGE)) {
       return { status: 200, file: rel + INDEX_PAGE };
     }
-  } else {
-    if (files.has(rel)) return { status: 200, file: rel };
-    if (files.has(`${rel}/${INDEX_PAGE}`)) {
-      return { status: 308, location: `${path}/${search ?? ""}` };
-    }
+    const bare = rel.slice(0, -1);
+    if (bare && files.has(`${bare}.html`)) return redirect(`/${bare}`);
+    return notFound(path, allFiles);
   }
-  return notFound(path, files);
+
+  const name = rel.split("/").pop();
+  const dir = rel.slice(0, rel.length - name.length);
+  if (
+    (name === INDEX_PAGE || name === "index") &&
+    files.has(dir + INDEX_PAGE)
+  ) {
+    return redirect(`/${dir}`);
+  }
+  if (name.endsWith(".html")) {
+    if (files.has(rel)) return redirect(`/${rel.slice(0, -".html".length)}`);
+    return notFound(path, allFiles);
+  }
+  if (files.has(rel)) return { status: 200, file: rel };
+  if (files.has(`${rel}.html`)) return { status: 200, file: `${rel}.html` };
+  if (files.has(`${rel}/${INDEX_PAGE}`)) return redirect(`${path}/`);
+  return notFound(path, allFiles);
 }
 
 // Recursively lists the files of `root` as exact-case POSIX relative paths.
@@ -158,8 +192,8 @@ function startServer({ dir, port }) {
       files,
     });
 
-    if (result.status === 308) {
-      res.writeHead(308, { Location: result.location }).end();
+    if (result.location) {
+      res.writeHead(result.status, { Location: result.location }).end();
       return;
     }
     if (result.file === null) {

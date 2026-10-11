@@ -58,12 +58,13 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
 
   - Resolución (2026-10-11): el usuario acepta el comportamiento de Cloudflare (spec: RF-17 a RF-20 reescritos, D17; RP-4 resuelto, sin código de Worker). T5 queda hecha con lo observado; los 4 fallos se corrigen en T6 actualizando las comprobaciones del smoke test.
 
-- [ ] **T6. Smoke test y servidor local alineados con Cloudflare (D17).** RF-17, RF-18, RF-19, RF-20, RF-21, RF-24, RF-25
+- [x] **T6. Smoke test y servidor local alineados con Cloudflare (D17).** RF-17, RF-18, RF-19, RF-20, RF-21, RF-24, RF-25
   - Tests primero (en rojo):
     - `scripts/staging/smoke-checks.test.mjs`: filas nuevas de la tabla de la sección 5 del plan: `/404` y `/en/404` → 200 con `lang` es/en y noindex; `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404` con noindex; `/en`, `/en?x=1`, `/index.html` y `/en/index.html` → exactamente 307 (un 308, o un 404 en `/404`, → rojo).
     - `scripts/serve-static.test.mjs`: columna "local": `/404` y `/en/404` → 200 con la 404 de su idioma; `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404`; `/en` → 307 `/en/` y `/en?x=1` → 307 `/en/?x=1`; `/index.html` y `/en/index.html` → 307 a `/` y `/en/` con query; carpeta ficticia con `_headers` y `_redirects` → 404.
     - `apps/web/e2e/routing.spec.ts`: 308 → 307 en `/en`.
     - `apps/web/e2e/not-found.spec.ts`: antes de tocarlo, observar `/404/` y `/en/404/` con `pnpm --filter web staging:local` y anotar el resultado aquí; el test "`/en/404/` is not served as a page" y el servidor local se alinean con lo observado. Si alguna responde 200 con contenido distinto de la 404 de su idioma, PARAR (RP-4).
+      - Observado con `wrangler dev` (2026-10-11): `/404/` → 307 `/404` y `/en/404/` → 307 `/en/404` (que sirven su propia 404 con 200), con noindex. No hay un 200 con otro contenido: no se activa RP-4. Otras rutas observadas para el servidor local: `/404.html?x=1` → 307 `/404?x=1`; `/index.html?x=1` → 307 `/?x=1`; `/index` → 307 `/`; `/en/index` → 307 `/en/`; `/en/index/` → 307 `/en/index`; `/favicon.svg/`, `/404.html/`, `/index.html/` → 404 ES; `/en/404.html/` → 404 EN.
   - Después: `SMOKE_CHECKS` en `scripts/staging/smoke-checks.mjs`, `scripts/serve-static.mjs` y su comentario de cabecera (ya no "308").
   - Hecho cuando:
     - Los tests pasaron de rojo a verde.

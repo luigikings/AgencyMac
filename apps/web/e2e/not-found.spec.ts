@@ -128,10 +128,12 @@ test.describe("404 pages without JavaScript", () => {
   });
 
   // D4: the English 404 is served from "en/404.html"; the folder Astro emits
-  // ("en/404/index.html") is gone, so "/en/404/" is not a 200 page.
+  // ("en/404/index.html") is gone, so "/en/404/" is not a 200 page. Spec 003
+  // (D17): like Cloudflare, it redirects with a 307 to "/en/404".
   test("/en/404/ is not served as a page", async ({ request }) => {
-    const response = await request.get("/en/404/");
-    expect(response.status()).toBe(404);
+    const response = await request.get("/en/404/", { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()["location"]).toBe("/en/404");
   });
 });
 

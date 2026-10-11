@@ -27,16 +27,64 @@ describe("resolveRequest", () => {
     expect(resolve("/en/")).toEqual({ status: 200, file: "en/index.html" });
   });
 
-  it("redirects /en to /en/ with a 308", () => {
-    expect(resolve("/en")).toEqual({ status: 308, location: "/en/" });
+  // Spec 003, D17: the same codes Cloudflare (wrangler dev) answers with.
+  it("redirects /en to /en/ with a 307", () => {
+    expect(resolve("/en")).toEqual({ status: 307, location: "/en/" });
   });
 
   it("keeps the query string when redirecting /en?x=1", () => {
     expect(resolve("/en", "?x=1")).toEqual({
-      status: 308,
+      status: 307,
       location: "/en/?x=1",
     });
   });
+
+  it.each([
+    ["/404", "404.html"],
+    ["/en/404", "en/404.html"],
+  ])("serves %s with 200 and the error page of its locale", (path, file) => {
+    expect(resolve(path)).toEqual({ status: 200, file });
+  });
+
+  it.each([
+    ["/404.html", "", "/404"],
+    ["/en/404.html", "", "/en/404"],
+    ["/404.html", "?x=1", "/404?x=1"],
+    ["/index.html", "", "/"],
+    ["/en/index.html", "", "/en/"],
+    ["/index.html", "?x=1", "/?x=1"],
+    ["/en/index.html", "?x=1", "/en/?x=1"],
+    ["/index", "", "/"],
+    ["/en/index", "", "/en/"],
+    ["/404/", "", "/404"],
+    ["/en/404/", "", "/en/404"],
+    ["/en/index/", "", "/en/index"],
+  ])("redirects %s%s to %s with a 307", (path, search, location) => {
+    expect(resolve(path, search)).toEqual({ status: 307, location });
+  });
+
+  it.each([
+    ["/favicon.svg/", "404.html"],
+    ["/404.html/", "404.html"],
+    ["/index.html/", "404.html"],
+    ["/en/404.html/", "en/404.html"],
+    ["/x.html", "404.html"],
+  ])("serves %s as a 404 (%s)", (path, file) => {
+    expect(resolve(path)).toEqual({ status: 404, file });
+  });
+
+  it.each(["/_headers", "/_redirects"])(
+    "never serves the hosting rules file %s",
+    (path) => {
+      expect(
+        resolveRequest({
+          pathname: path,
+          search: "",
+          files: new Set([...files, "_headers", "_redirects"]),
+        }),
+      ).toEqual({ status: 404, file: "404.html" });
+    },
+  );
 
   it.each(["/EN/", "/En/", "/EN", "/En/index.html"])(
     "is case-sensitive: %s gets the Spanish 404",

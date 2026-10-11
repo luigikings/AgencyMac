@@ -26,9 +26,16 @@ const notFound = (path, lang, extra = {}) => ({
   ...extra,
 });
 
-// Table of section 5 of the plan. Status "redirect" accepts any 3xx code
-// (the exact one is observed in T5); "redirect-or-ok" also accepts 200, and
-// then the page must carry its canonical.
+// Cloudflare answers these redirects with 307 (observed with wrangler dev in
+// T5 and accepted in D17); the local server copies it.
+const redirect = (path, location) => ({
+  path,
+  status: 307,
+  location,
+  noindex: true,
+});
+
+// Table of section 5 of the plan (codes observed in Cloudflare, D17).
 export const SMOKE_CHECKS = [
   home("/", "es", `${SITE}/`),
   home("/en/", "en", `${SITE}/en/`),
@@ -36,24 +43,15 @@ export const SMOKE_CHECKS = [
   notFound("/no-existe", "es", { noindex: true }),
   notFound("/en/no-existe/", "en", { noindex: true }),
   notFound("/en/no-existe", "en", { noindex: true }),
-  notFound("/404", "es"),
-  notFound("/404.html", "es"),
-  notFound("/en/404", "en"),
-  notFound("/en/404.html", "en"),
-  {
-    path: "/index.html",
-    status: "redirect-or-ok",
-    location: "/",
-    canonical: `${SITE}/`,
-  },
-  {
-    path: "/en/index.html",
-    status: "redirect-or-ok",
-    location: "/en/",
-    canonical: `${SITE}/en/`,
-  },
-  { path: "/en", status: "redirect", location: "/en/", noindex: true },
-  { path: "/en?x=1", status: "redirect", location: "/en/?x=1", noindex: true },
+  // The error pages requested by their own URL answer 200 (D17).
+  { path: "/404", status: 200, lang: "es", noindex: true },
+  redirect("/404.html", "/404"),
+  { path: "/en/404", status: 200, lang: "en", noindex: true },
+  redirect("/en/404.html", "/en/404"),
+  redirect("/index.html", "/"),
+  redirect("/en/index.html", "/en/"),
+  redirect("/en", "/en/"),
+  redirect("/en?x=1", "/en/?x=1"),
   notFound("/EN/", "es"),
   notFound("/En/", "es"),
   notFound("/Favicon.svg", "es"),
@@ -104,20 +102,6 @@ function htmlTitle(html) {
   return match ? match[1].trim() : null;
 }
 
-function statusAllowed(check, status) {
-  if (check.status === "redirect") return REDIRECT_CODES.includes(status);
-  if (check.status === "redirect-or-ok")
-    return status === 200 || REDIRECT_CODES.includes(status);
-  return status === check.status;
-}
-
-function expectedStatus(check) {
-  if (check.status === "redirect") return REDIRECT_CODES.join("|");
-  if (check.status === "redirect-or-ok")
-    return [...REDIRECT_CODES, 200].join("|");
-  return String(check.status);
-}
-
 export function evaluateResponse(check, response, { baseUrl }) {
   const problems = [];
   const expect = (expected, actual) => problems.push({ expected, actual });
@@ -125,8 +109,8 @@ export function evaluateResponse(check, response, { baseUrl }) {
   const body = response.body ?? "";
   const isRedirect = REDIRECT_CODES.includes(status);
 
-  if (!statusAllowed(check, status)) {
-    expect(`status ${expectedStatus(check)}`, String(status));
+  if (status !== check.status) {
+    expect(`status ${check.status}`, String(status));
   }
 
   if (check.noindex) {

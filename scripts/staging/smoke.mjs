@@ -94,9 +94,13 @@ export async function runSmoke({ baseUrl, version, log = console.log }) {
     now: () => Date.now(),
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
   });
-  if (!versionResult.ok)
-    return { ok: false, failures: [versionResult.failure] };
-  log(`ok   / (X-Staging-Version ${version})`);
+  // A version mismatch is a failure, but the other checks still run so the
+  // log shows everything that differs.
+  if (versionResult.ok) log(`ok   / (X-Staging-Version ${version})`);
+  else {
+    failures.push(versionResult.failure);
+    log("FAIL / (X-Staging-Version)");
+  }
 
   for (const check of SMOKE_CHECKS) await run(check);
 

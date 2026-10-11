@@ -48,9 +48,9 @@ function goodResponse(check) {
     ...noindex,
     ...(check.contentType ? { "content-type": check.contentType } : {}),
   };
-  if (check.status === "redirect" || check.status === "redirect-or-ok") {
+  if (check.location) {
     return {
-      status: 308,
+      status: check.status,
       headers: { ...headers, location: check.location },
       body: "",
     };
@@ -103,25 +103,43 @@ describe("SMOKE_CHECKS (table of section 5)", () => {
     ["/en/", 200, "en"],
     ["/no-existe/", 404, "es"],
     ["/en/no-existe", 404, "en"],
-    ["/404.html", 404, "es"],
-    ["/en/404", 404, "en"],
+    ["/404", 200, "es"],
+    ["/en/404", 200, "en"],
     ["/EN/", 404, "es"],
     ["/Favicon.svg", 404, "es"],
   ])("%s expects status %i and lang %s", (path, status, lang) => {
     expect(checkFor(path)).toMatchObject({ status, lang });
   });
 
-  it("asks for noindex on the pages, the 404s and the /en redirects", () => {
-    for (const path of ["/", "/en/", "/no-existe/", "/en/no-existe/", "/en"]) {
-      expect(checkFor(path).noindex, path).toBe(true);
-    }
+  // D17: the codes observed in Cloudflare (wrangler dev), exactly 307.
+  it.each([
+    ["/404.html", "/404"],
+    ["/en/404.html", "/en/404"],
+    ["/index.html", "/"],
+    ["/en/index.html", "/en/"],
+    ["/en", "/en/"],
+    ["/en?x=1", "/en/?x=1"],
+  ])("%s expects exactly 307 to %s", (path, location) => {
+    expect(checkFor(path)).toMatchObject({ status: 307, location });
   });
 
-  it("keeps the query string on the /en redirect", () => {
-    expect(checkFor("/en?x=1")).toMatchObject({
-      status: "redirect",
-      location: "/en/?x=1",
-    });
+  it("asks for noindex on pages, 404s, the 200 error pages and redirects", () => {
+    for (const path of [
+      "/",
+      "/en/",
+      "/no-existe/",
+      "/en/no-existe/",
+      "/404",
+      "/en/404",
+      "/404.html",
+      "/en/404.html",
+      "/index.html",
+      "/en/index.html",
+      "/en",
+      "/en?x=1",
+    ]) {
+      expect(checkFor(path).noindex, path).toBe(true);
+    }
   });
 });
 
@@ -133,12 +151,48 @@ describe("evaluateResponse — failures", () => {
   };
 
   it("fails when a 404 is served with 200", () => {
+    const failures = fail("/no-existe/", {
+      status: 200,
+      headers: { ...html, ...noindex },
+      body: page({ lang: "es" }),
+    });
+    expect(failures).toEqual(["/no-existe/: expected status 404, got 200"]);
+  });
+
+  it("fails when /404 answers 404 instead of 200", () => {
+    const failures = fail("/404", {
+      status: 404,
+      headers: { ...html, ...noindex },
+      body: page({ lang: "es" }),
+    });
+    expect(failures).toEqual(["/404: expected status 200, got 404"]);
+  });
+
+  it("fails when /en/404 serves the Spanish error page", () => {
+    const failures = fail("/en/404", {
+      status: 200,
+      headers: { ...html, ...noindex },
+      body: page({ lang: "es" }),
+    });
+    expect(failures).toEqual(['/en/404: expected lang "en", got "es"']);
+  });
+
+  it("fails when /404.html is served instead of redirected", () => {
     const failures = fail("/404.html", {
       status: 200,
       headers: { ...html, ...noindex },
       body: page({ lang: "es" }),
     });
-    expect(failures).toEqual(["/404.html: expected status 404, got 200"]);
+    expect(failures).toEqual(["/404.html: expected status 307, got 200"]);
+  });
+
+  it("fails on a 308 where Cloudflare answers 307", () => {
+    const failures = fail("/en", {
+      status: 308,
+      headers: { ...noindex, location: "/en/" },
+      body: "",
+    });
+    expect(failures).toEqual(["/en: expected status 307, got 308"]);
   });
 
   it("fails when the language is swapped", () => {
@@ -172,7 +226,7 @@ describe("evaluateResponse — failures", () => {
 
   it("fails when the redirect loses the query string", () => {
     const failures = fail("/en?x=1", {
-      status: 308,
+      status: 307,
       headers: { ...noindex, location: `${BASE_URL}/en/` },
       body: "",
     });
@@ -187,7 +241,7 @@ describe("evaluateResponse — failures", () => {
       headers: { ...html, ...noindex },
       body: page({ lang: "es" }),
     });
-    expect(failures).toEqual(["/en: expected status 301|302|307|308, got 404"]);
+    expect(failures).toEqual(["/en: expected status 307, got 404"]);
   });
 
   it("fails on the Control Center title", () => {
@@ -245,28 +299,22 @@ describe("evaluateResponse — failures", () => {
       headers: { ...html, ...noindex },
       body: page(),
     });
-    expect(failures).toEqual([
-      "/index.html: expected status 301|302|307|308|200, got 404",
-    ]);
+    expect(failures).toEqual(["/index.html: expected status 307, got 404"]);
   });
 
-  it("accepts /index.html served with 200 and its canonical", () => {
-    const result = evaluateResponse(
-      checkFor("/index.html"),
-      {
-        status: 200,
-        headers: { ...html, ...noindex },
-        body: page({ canonical: `${SITE}/` }),
-      },
-      context,
-    );
-    expect(result).toEqual({ ok: true, failures: [] });
+  it("fails when /index.html is served with 200 instead of redirected", () => {
+    const failures = fail("/index.html", {
+      status: 200,
+      headers: { ...html, ...noindex },
+      body: page({ canonical: `${SITE}/` }),
+    });
+    expect(failures).toEqual(["/index.html: expected status 307, got 200"]);
   });
 
   it("fails when /index.html redirects somewhere else, hiding other hosts", () => {
     const failures = fail("/index.html", {
-      status: 301,
-      headers: { location: "https://example.org/" },
+      status: 307,
+      headers: { ...noindex, location: "https://example.org/" },
       body: "",
     });
     expect(failures).toEqual([
