@@ -211,6 +211,7 @@ Validación del reviewer: VEREDICTO: APROBADO. Comprobaciones reales y manuales 
 - **RF-39 (manual):** en el registro público del CI (1013 líneas), la URL solo aparece como `***.workers.dev`.
 - **RF-8 (manual):** plan gratuito de Workers (100.000 peticiones al día) y minutos gratuitos de Actions en repo público; coste 0 €.
 - **RF-7:** la parte automática (test de `wrangler.json`: sin rutas, dominios ni `account_id`) está en verde. El despliegue usa solo `*.workers.dev`.
+- **RF-7 (manual, 2026-10-11):** el usuario confirma que `agencymac.com` no está en su cuenta de Cloudflare (el panel no tiene ningún dominio) y que no ha tocado su DNS.
 - **Revisión visual del usuario** en móvil y escritorio, inicio y 404, ES y EN: sin incidencias.
 
 ## Notas de cambios
