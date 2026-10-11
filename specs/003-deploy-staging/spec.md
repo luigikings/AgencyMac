@@ -76,10 +76,10 @@ Métodos de verificación:
 - RF-14: CUANDO arranca el smoke test, EL SISTEMA reintenta, con un límite fijo de 3 minutos como máximo, hasta que la cabecera de versión de la URL de prueba coincida con el identificador esperado; SI no coincide dentro del límite, ENTONCES falla indicando la versión obtenida. _Verifica: Test de lógica con reloj inyectado (coincide a la primera, coincide tras reintentos, se agota el límite)._
 - RF-15: CUANDO se pide `/` o `/en/`, EL SISTEMA (staging) responde 200 con la página de inicio de la web pública en su idioma (atributo de idioma `es` o `en` y nombre de la web en el título) y nunca con la página del Centro de Control (su título no aparece). _Verifica: Test de lógica + Smoke._
 - RF-16: CUANDO se pide una URL inexistente sin prefijo `/en/` (`/no-existe/` y `/no-existe`), EL SISTEMA (staging) responde 404 con la página de error en español; CUANDO empieza por `/en/` (`/en/no-existe/` y `/en/no-existe`), responde 404 con la página de error en inglés. _Verifica: Test de lógica + Smoke (estado e idioma)._
-- RF-17: CUANDO se pide `/404`, `/404.html`, `/en/404` o `/en/404.html`, EL SISTEMA (staging y servidor local) responde con estado 404 y la página de error de su idioma (ES para las dos primeras, EN para las dos últimas); una página de error servida con estado 200 nunca es aceptable. _Verifica: Test de lógica + Smoke + Test local._ (Si la configuración de Cloudflare no lo permite, se aplica RP-4.)
-- RF-18: CUANDO se pide `/index.html` o `/en/index.html`, EL SISTEMA (staging y servidor local) redirige a `/` y `/en/` respectivamente, o responde 200 con la misma página y su canonical; nunca 404. El comportamiento de Cloudflare se anota y el servidor local se alinea con él. _Verifica: Test de lógica + Smoke + Test local._
-- RF-19: CUANDO se pide `/en` sin barra final, EL SISTEMA (staging) redirige a `/en/` conservando la query string (`/en?x=1` → `/en/?x=1`) y nunca responde 404. _Verifica: Test de lógica + Smoke (estado y cabecera de destino)._
-- RF-20: EL SISTEMA (servidor local) usa en RF-18 y RF-19 los mismos códigos de redirección que Cloudflare; SI difieren, ENTONCES se ajusta el servidor local a Cloudflare. _Verifica: Smoke + Test local con el código observado en Cloudflare._
+- RF-17: CUANDO se pide `/404` o `/en/404`, EL SISTEMA (staging y servidor local) responde 200 con la página de error de su idioma (ES y EN respectivamente), con `X-Robots-Tag: noindex` en staging; CUANDO se pide `/404.html` o `/en/404.html`, redirige con 307 a `/404` y `/en/404` respectivamente. Es el comportamiento de Cloudflare, aceptado por el usuario (D17): nadie enlaza a esas rutas, y las URLs inexistentes sí responden 404 (RF-16, RF-21). _Verifica: Test de lógica + Smoke + Test local._
+- RF-18: CUANDO se pide `/index.html` o `/en/index.html`, EL SISTEMA (staging y servidor local) redirige con 307 a `/` y `/en/` respectivamente, conservando la query string. _Verifica: Test de lógica + Smoke + Test local._
+- RF-19: CUANDO se pide `/en` sin barra final, EL SISTEMA (staging y servidor local) redirige con 307 a `/en/` conservando la query string (`/en?x=1` → `/en/?x=1`) y nunca responde 404. _Verifica: Test de lógica + Smoke + Test local (estado y cabecera de destino)._
+- RF-20: EL SISTEMA (servidor local) usa en RF-17, RF-18 y RF-19 los mismos códigos que Cloudflare (307, observado el 2026-10-11 con `wrangler dev`); SI el primer despliegue real muestra otro código, ENTONCES se ajusta el servidor local a Cloudflare (RP-3). _Verifica: Smoke + Test local._
 - RF-21: SI se pide una URL con mayúsculas (`/EN/`, `/En/`, `/Favicon.svg`), ENTONCES EL SISTEMA (staging) responde 404 con la página de error en español, igual que el servidor local. _Verifica: Test de lógica + Smoke + Test local._
 - RF-22: CUANDO se pide el favicon declarado en las páginas, EL SISTEMA (staging) responde 200 con tipo de contenido `image/svg+xml`. _Verifica: Test de lógica + Smoke._
 - RF-23: CUANDO se pide cualquier tipografía woff2 referenciada por `/` o por `/en/`, EL SISTEMA (staging) responde 200 con tipo de contenido `font/woff2`. _Verifica: Test de lógica + Smoke (lee las URLs de fuentes del HTML/CSS servido)._
@@ -112,7 +112,7 @@ Métodos de verificación:
 - RP-1: Ningún agente crea cuentas ni genera, ve, copia o guarda tokens, IDs de cuenta, el subdominio de la cuenta ni secretos; el alta inicial la hace solo el usuario (RF-38).
 - RP-2: Crear los secretos en el entorno "staging" equivale a autorizar el despliegue. Antes de eso no hay despliegue real (RF-37); el coordinador pide la autorización al usuario y el usuario crea los secretos. La fecha queda anotada en la spec.
 - RP-3: Si el smoke test detecta una diferencia entre Cloudflare y el servidor local (RF-27), se corrige la configuración del alojamiento o el servidor local antes de cerrar la spec, y la diferencia y su solución quedan anotadas en esta spec y en `MEMORY.md`.
-- RP-4: Si la configuración de Cloudflare no permite cumplir RF-17 (estado 404 en `/404`, `/404.html`, `/en/404` y `/en/404.html`) o RF-25 (`noindex` en las 3xx), el implementer PARA y decide el usuario. No se añade código de Worker ni dependencias nuevas sin su aprobación.
+- RP-4: Si la configuración de Cloudflare no permite cumplir RF-17 a RF-19 tal como están escritos o RF-25 (`noindex` en las 3xx), el implementer PARA y decide el usuario. No se añade código de Worker ni dependencias nuevas sin su aprobación. (Aplicado el 2026-10-11 en T5: resuelto con D17.)
 
 ## Requisitos no funcionales
 
@@ -129,9 +129,9 @@ Métodos de verificación:
 
 ## Casos límite
 
-- `/en` sin barra y con query string (RF-19); Cloudflare puede usar un código distinto del 308 local (RF-20).
+- `/en` sin barra y con query string (RF-19): Cloudflare usa 307 y el servidor local, que usaba 308, pasa a 307 (RF-20).
 - `/no-existe` y `/en/no-existe` sin barra (RF-16).
-- `/404`, `/404.html`, `/en/404`, `/en/404.html`: estado 404 siempre, nunca 200 (RF-17). Hoy el servidor local sirve `/404.html` con 200: se corrige. Si Cloudflare no lo permite: RP-4.
+- `/404` y `/en/404` → 200 con la página de error de su idioma; `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404` (RF-17, D17). Hoy el servidor local sirve `/404.html` con 200: pasa a redirigir con 307.
 - `/index.html`, `/en/index.html` (RF-18).
 - `/EN/`, `/En/`, `/Favicon.svg` → 404 ES (RF-21).
 - Archivos de reglas de cabeceras o redirecciones pedidos directamente (RF-24).
@@ -158,6 +158,7 @@ Métodos de verificación:
 - Vuelta atrás automática.
 - Cloudflare Pages y la compilación en Cloudflare.
 - Código de Worker propio (solo assets estáticos), salvo aprobación según RP-4.
+- Que `/404` y `/en/404` respondan 404 en vez de 200 (D17). Se revisará en la spec de producción, donde no habrá `noindex` de staging.
 - Protección del entorno de prueba con contraseña o Cloudflare Access.
 - Robots.txt, sitemap, Open Graph y JSON-LD (spec de la web pública).
 - Lighthouse contra la URL desplegada. Analíticas, monitorización y alertas. Contenido real de la web.
@@ -191,7 +192,12 @@ Decididas o confirmadas por el usuario el 2026-10-11.
 - D14. **Una sola build por ejecución del CI**: los tests en navegador, Lighthouse y el despliegue usan la misma build, sin recompilar; el uso local de `pnpm test` y `pnpm quality` no cambia (cómo se consigue se decide en el plan) (RF-11, RNF-9). Como artefacto del CI solo se sube la build, que es pública; nunca informes de Lighthouse, trazas ni capturas, porque los artefactos de Actions de un repo público son descargables (RF-34).
 - D15. **La URL de prueba no se versiona ni se muestra en claro en los registros**: un tercer secreto del entorno "staging" guarda el subdominio de la cuenta, el job compone la URL con él y GitHub la enmascara (RF-12, RF-39, RF-40). El usuario consulta la URL en su panel de Cloudflare. Descartados: leer la URL de la salida de la herramienta de despliegue (la imprimiría antes de poder enmascararla) y dejarla visible en los registros públicos.
 - D16. **Riesgo del token aceptado**: el token solo tiene permiso de Workers, pero puede editar cualquier Worker de la cuenta; caduca en 12 meses como máximo y vive en el entorno restringido a main. Se revisará al pasar a producción (RF-38).
+- D17. **Se acepta el comportamiento de Cloudflare en las rutas de la página de error** (decidido por el usuario el 2026-10-11, tras RP-4 en T5): `/404` y `/en/404` → 200 con la página de error de su idioma (y `noindex` en staging); `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404`. Los códigos de redirección son 307 en `/en`, `/index.html` y `/404.html`, y el servidor local los copia (D6). Por qué: nadie enlaza a esas rutas y las URLs inexistentes sí responden 404 en su idioma (RF-16, RF-21). Descartados: un Worker propio que fuerce el 404 (código nuevo para un caso sin tráfico real) y otro `html_handling` (rompería la redirección de `/en` a `/en/`). Se revisa en la spec de producción.
 
 ## Dudas abiertas
 
 - Ninguna.
+
+## Notas de cambios
+
+- 2026-10-11: RP-4 aplicado en T5 tras observar Cloudflare con `wrangler dev`. RF-17 cambia (`/404` y `/en/404` → 200; `/404.html` y `/en/404.html` → 307); RF-18, RF-19 y RF-20 fijan 307; nueva D17; casos límite, RP-4 y "Fuera de alcance" ajustados. Aprobado por el usuario; la spec sigue aprobada.

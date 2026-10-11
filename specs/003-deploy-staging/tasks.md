@@ -31,17 +31,44 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
     - `pnpm --filter web staging:copy` (con `local`) crea `apps/web/.staging/` con la build más `_headers`, y `apps/web/dist` no cambia.
     - `pnpm smoke` sin `--url` ni secreto sale con código distinto de cero y un mensaje claro.
 
-- [ ] **T5. Worker y paridad en local con `wrangler dev`: primero los tests de `wrangler.json` en `scripts/ci-workflow.test.mjs`; después `apps/web/wrangler.json` (sección 2 del plan) y el script `staging:local` (copia + `wrangler dev --port 8787`). Ejecutar `pnpm smoke --url http://localhost:8787 --version local` y anotar en `tasks.md` la tabla observada (códigos de `/en`, `/index.html`, `/404`, `/404.html`, mayúsculas, `_headers`, noindex en 3xx).** RF-6, RF-7, RF-17 a RF-25, RP-4
+- [x] **T5. Worker y paridad en local con `wrangler dev`: primero los tests de `wrangler.json` en `scripts/ci-workflow.test.mjs`; después `apps/web/wrangler.json` (sección 2 del plan) y el script `staging:local` (copia + `wrangler dev --port 8787`). Ejecutar `pnpm smoke --url http://localhost:8787 --version local` y anotar en `tasks.md` la tabla observada (códigos de `/en`, `/index.html`, `/404`, `/404.html`, mayúsculas, `_headers`, noindex en 3xx).** RF-6, RF-7, RF-17 a RF-25, RP-4
   - Hecho cuando:
     - El test de `wrangler.json` pasó de rojo a verde (nombre, `workers_dev`, `preview_urls: false`, assets, sin rutas, dominios, `account_id` ni `vars`).
     - La tabla observada está anotada.
     - **Si `/404`, `/404.html`, `/en/404` o `/en/404.html` no dan 404, o la 3xx no lleva `X-Robots-Tag`: PARAR y avisar al coordinador (RP-4); no se sigue con T6.**
     - Ninguna petición sale a Cloudflare (sin login, sin cuenta).
+  - Observado con `wrangler dev` 4.149.0 (2026-10-11, copia `local`, `html_handling: "auto-trailing-slash"`, `not_found_handling: "404-page"`). **RP-4 activado: parada en T5.**
 
-- [ ] **T6. Servidor local alineado con Cloudflare: primero la columna "local" de la tabla de la sección 5 en `scripts/serve-static.test.mjs` (con los códigos observados en T5 y una carpeta ficticia con `_headers` y `_redirects`) y el ajuste de `apps/web/e2e/routing.spec.ts` si cambia el código de `/en`; después `scripts/serve-static.mjs` y su comentario de cabecera.** RF-17, RF-18, RF-20, RF-21, RF-24
+    | Petición                          | Observado                                                     |
+    | --------------------------------- | ------------------------------------------------------------- |
+    | `/`, `/en/`                       | 200, `lang` es/en, noindex                                    |
+    | `/en`, `/en?x=1`                  | 307 → `/en/`, `/en/?x=1`; noindex                             |
+    | `/index.html`, `/en/index.html`   | 307 → `/`, `/en/`; noindex                                    |
+    | `/404`, `/en/404`                 | **200** con la 404 ES/EN; noindex (incumple RF-17)            |
+    | `/404.html`, `/en/404.html`       | **307** → `/404`, `/en/404` (y estas dan 200; incumple RF-17) |
+    | `/no-existe/`, `/no-existe`       | 404 ES, noindex                                               |
+    | `/en/no-existe/`, `/en/no-existe` | 404 EN, noindex                                               |
+    | `/EN/`, `/En/`, `/Favicon.svg`    | 404 ES, noindex                                               |
+    | `/favicon.svg`                    | 200 `image/svg+xml`, noindex                                  |
+    | woff2 (3 archivos)                | 200 `font/woff2`, noindex                                     |
+    | `/_headers`, `/_redirects`        | 404 ES, noindex                                               |
+    | 3xx                               | Todas llevan `X-Robots-Tag: noindex` (RF-25 se cumple)        |
+
+    `pnpm smoke --url http://localhost:8787 --version local`: versión `local` encontrada; 4 fallos, solo `/404`, `/404.html`, `/en/404` y `/en/404.html`.
+
+  - Resolución (2026-10-11): el usuario acepta el comportamiento de Cloudflare (spec: RF-17 a RF-20 reescritos, D17; RP-4 resuelto, sin código de Worker). T5 queda hecha con lo observado; los 4 fallos se corrigen en T6 actualizando las comprobaciones del smoke test.
+
+- [ ] **T6. Smoke test y servidor local alineados con Cloudflare (D17).** RF-17, RF-18, RF-19, RF-20, RF-21, RF-24, RF-25
+  - Tests primero (en rojo):
+    - `scripts/staging/smoke-checks.test.mjs`: filas nuevas de la tabla de la sección 5 del plan: `/404` y `/en/404` → 200 con `lang` es/en y noindex; `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404` con noindex; `/en`, `/en?x=1`, `/index.html` y `/en/index.html` → exactamente 307 (un 308, o un 404 en `/404`, → rojo).
+    - `scripts/serve-static.test.mjs`: columna "local": `/404` y `/en/404` → 200 con la 404 de su idioma; `/404.html` y `/en/404.html` → 307 a `/404` y `/en/404`; `/en` → 307 `/en/` y `/en?x=1` → 307 `/en/?x=1`; `/index.html` y `/en/index.html` → 307 a `/` y `/en/` con query; carpeta ficticia con `_headers` y `_redirects` → 404.
+    - `apps/web/e2e/routing.spec.ts`: 308 → 307 en `/en`.
+    - `apps/web/e2e/not-found.spec.ts`: antes de tocarlo, observar `/404/` y `/en/404/` con `pnpm --filter web staging:local` y anotar el resultado aquí; el test "`/en/404/` is not served as a page" y el servidor local se alinean con lo observado. Si alguna responde 200 con contenido distinto de la 404 de su idioma, PARAR (RP-4).
+  - Después: `SMOKE_CHECKS` en `scripts/staging/smoke-checks.mjs`, `scripts/serve-static.mjs` y su comentario de cabecera (ya no "308").
   - Hecho cuando:
-    - Los tests pasaron de rojo a verde: `/404.html` y `/en/404.html` → 404 (ya no 200), `_headers`/`_redirects` → 404, y `/en` e `/index.html` con el código observado.
-    - `pnpm smoke --url http://localhost:4322 --version local` solo falla en la versión y el noindex (que el servidor local no añade), nada más.
+    - Los tests pasaron de rojo a verde.
+    - `pnpm smoke --url http://localhost:8787 --version local` (con `staging:local`) termina con código 0.
+    - `pnpm smoke --url http://localhost:4322 --version local` solo falla en la versión y en el noindex (que el servidor local no añade), nada más.
     - `pnpm test` y `pnpm quality` en verde.
 
 - [ ] **T7. Una sola build en el CI: primero un test en `ci-workflow.test.mjs` o en un test de configuración que compruebe que, con `PREBUILT_DIST=1`, los `webServer` de `playwright.config.ts` no compilan; después `playwright.config.ts` y `--no-sandbox` condicionado a `CI` en `apps/web/lighthouserc.cjs`.** RF-11, RF-28, RNF-9
@@ -59,7 +86,7 @@ Nunca: crear cuentas, manejar tokens, ejecutar `wrangler login` o `wrangler depl
 - [ ] **T9. Documentación: `docs/staging.md` (alta de la sección 7 del plan, con el aviso del subdominio largo y poco común, permiso solo de Workers, caducidad ≤ 12 meses, entorno antes del workflow), `AGENTS.md` raíz (comandos, puerto 8787, regla de despliegue, datos que nunca se versionan), `apps/web/AGENTS.md` (códigos del servidor local, Worker, `.staging/`), `README.md` (CI y entorno de prueba, sin URL) y nota en `MEMORY.md` de la decisión de staging.** RF-38, RP-1, RP-2
   - Hecho cuando:
     - Las instrucciones siguen el orden de RF-38 y avisan de revisar y restringir el entorno si GitHub lo creó solo.
-    - `apps/web/AGENTS.md` ya no dice "`/en` → 308" si el código cambió.
+    - `apps/web/AGENTS.md` y el README describen el servidor local con 307 (`/en`, `/index.html`, `/404.html`) y `/404` con 200 (D17); ya no dicen "`/en` → 308".
     - `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm format:check` y `pnpm quality` terminan con código 0, y `no-leaks` no encuentra nada.
     - Todo commiteado en local, **sin push**.
 

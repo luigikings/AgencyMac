@@ -8,6 +8,7 @@
     "preview": "node ../../scripts/serve-static.mjs --dir dist --port 4322",
     "quality": "lhci autorun",
     "staging:copy": "node ../../scripts/staging/staging-copy.mjs --from dist --to .staging --version ${VERSION:-local}",
+    "staging:local": "node ../../scripts/staging/staging-copy.mjs --from dist --to .staging --version local && WRANGLER_SEND_METRICS=false wrangler dev --port 8787",
     "staging:deploy": "WRANGLER_SEND_METRICS=false wrangler deploy"
   },
   "devDependencies": {
