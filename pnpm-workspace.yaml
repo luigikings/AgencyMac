@@ -6,3 +6,10 @@ packages:
 shellEmulator: true
 # Refuse to install when the running Node does not match `engines` (Node 24).
 engineStrict: true
+# Install scripts pnpm may run (any other is blocked). workerd (from wrangler,
+# spec 003) checks/links its native runtime binary. esbuild (also from
+# wrangler) is denied: its platform binary comes as an optional dependency
+# and works without the postinstall step.
+allowBuilds:
+  esbuild: false
+  workerd: true

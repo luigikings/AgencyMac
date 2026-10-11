@@ -18,6 +18,9 @@ export default defineConfig(
     "test-results/",
     "playwright-report/",
     "**/.lighthouseci/",
+    // Wrangler local state and the staging copy of the web (spec 003).
+    "**/.wrangler/",
+    "apps/web/.staging/",
   ]),
   js.configs.recommended,
   tseslint.configs.recommended,

@@ -16,6 +16,10 @@ playwright-report/
 !.env.example
 .dev.vars
 
+# Wrangler local state (may hold account data) and the staging copy of the web
+.wrangler/
+apps/web/.staging/
+
 # Local-only settings and private notes
 .claude/settings.local.json
 MEMORY.local.md

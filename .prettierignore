@@ -9,3 +9,7 @@ dist/
 test-results/
 playwright-report/
 .lighthouseci/
+
+# Wrangler local state and the staging copy of the web
+.wrangler/
+apps/web/.staging/
