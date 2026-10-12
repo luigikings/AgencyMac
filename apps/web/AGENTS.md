@@ -4,9 +4,9 @@ Web pública de AgencyMac: la carta de presentación de la agencia ante clientes
 
 ## Stack
 
-- Astro 7 con salida estática (`output: "static"`), sin JavaScript de cliente por ahora. GSAP/ScrollTrigger, Lenis y Rive llegarán en una spec posterior (quedaron fuera de la 002).
+- Astro 7 con salida estática (`output: "static"`), sin JavaScript de cliente por ahora (cierto hasta la fase B de la spec 004). GSAP/ScrollTrigger y Lenis llegan en esa fase B; Rive queda fuera.
 - Tests: Vitest para la lógica (`src/lib/*.test.ts`, `src/styles/*.test.ts`) y Playwright + axe-core para e2e (`e2e/`, lista de páginas en `e2e/pages.ts`).
-- Auditoría: Lighthouse CI (`lighthouserc.cjs`) de `/` y `/en/` con el `chrome-headless-shell` de Playwright, perfil móvil, mediana de 3 ejecuciones; además de las 4 categorías ≥ 0.9 exige LCP ≤ 2500 ms, CLS ≤ 0.1 y `font-display`.
+- Auditoría: Lighthouse CI (`lighthouserc.cjs`) de `/` y `/en/` con el `chrome-headless-shell` de Playwright, perfil móvil, mediana de 3 ejecuciones; además de las 4 categorías ≥ 0.9 exige LCP ≤ 2500 ms, CLS ≤ 0.1, TBT ≤ 200 ms y `font-display`.
 
 ## Comandos (desde la raíz)
 
@@ -44,10 +44,20 @@ Web pública de AgencyMac: la carta de presentación de la agencia ante clientes
 ## Marca
 
 - Los tokens de `src/styles/tokens.ts` son la única fuente de colores y tipografías. Ningún hex fuera de ese archivo: `no-loose-colors.test.ts` falla listando archivo y color. En CSS se usan las variables `--color-*`, `--font-heading` y `--font-body`.
-- El cian del logo (`logoCyan`, #00E5FF) es provisional: cuando exista el archivo del logo, se sustituye en `tokens.ts` por el valor real del archivo.
-- El favicon se genera desde los tokens (`src/pages/favicon.svg.ts`); no se añade un favicon escrito a mano.
+- La paleta sale del logo (naranjas y amarillos) más los colores de marca de `tokens.ts`; el contraste AA de cada pareja texto/fondo (incluidos los tres fondos de planeta) lo vigila `src/styles/contrast.test.ts`. Un fondo de color de la portada es siempre sólido: nada de texto sobre degradados o imágenes.
+- El favicon vectorial es el isologo redibujado con tres formas (`src/lib/favicon-isologo.ts`) y se sirve desde `src/pages/favicon.svg.ts` con los colores de los tokens; además se declaran `favicon-48.png` y `apple-touch-icon.png` (`public/`).
+- Imágenes: los originales viven en `Assets/` (raíz, ignorada por git: el repo es público) y nunca se versionan ni se nombran los que no se usan. Solo entran derivados, generados con `pnpm assets:build` (`scripts/assets/`; `pnpm assets:check` comprueba los SHA-256 de los originales). La procedencia está en `src/assets/brand/README.md` y en `scripts/assets/manifest.mjs`; `LICENSE-BRAND.md` los cubre.
+- Toda imagen de la portada pasa por `src/components/BrandPicture.astro` (AVIF y WebP en varios anchos, `width`/`height`, lazy salvo `priority`; `highPriority` solo para el candidato a LCP). Alt real; vacío solo en lo decorativo.
 - Tipografías autoalojadas en `src/assets/fonts/` (woff2 `latin` de Fontsource, Lilita One 400 y Lato 400/700) con la Fonts API de Astro (`fontProviders.local()`, `display: swap`). Llevan su licencia OFL-1.1 (`OFL-*.txt`) y `NOTICE.md`, que no se borran ni se modifican: la MIT del repo no cubre las fuentes. Nunca se cargan fuentes de otros dominios.
 - Foco visible con `outline` en `--color-button-hover`; enlaces en `--color-accent-green`, subrayados.
+
+## Portada (spec 004)
+
+- Cinco secciones en este orden: hero, servicios, proyectos, equipo y contacto (`src/components/home/`), compuestas por `HomeContent.astro` sobre `BaseLayout` con `fullWidth` (la portada va a ancho completo y cada sección pone su banda; las 404 conservan su columna estrecha).
+- Los nombres propios (servicios, proyectos, personas), los ids de sección y los destinos de los botones están en `src/lib/site-data.ts`. `CTA_TARGET` (`#contact`) es el único destino de "Quiero despegar" (`CtaButton.astro`): la spec 006 coloca el formulario dentro de `#contact` sin tocar el botón. "Descubre cómo" va a `#services` hasta que existan las páginas de servicio.
+- Los textos son la tabla "Textos propuestos" de `specs/004-web-portada/spec.md`: `translations.test.ts` la compara con `translations.ts` clave por clave. Sin precios ni datos de contacto (`src/lib/copy-rules.ts` los vigila en todos los textos).
+- Cada servicio es una banda de color sólido de su token (`planetHexawebBg`, `planetRankiaBg`, `planetAdaraBg`); no hay enlaces internos falsos y los dos externos (proyectos) llevan `target="_blank"` y `rel="noopener"`.
+- Metadatos sociales (`buildSocialMeta`), JSON-LD `Organization` sin teléfono, correo ni dirección (`structured-data.ts`, ensamblados en `home-seo.ts`), `sitemap.xml` y `robots.txt` (endpoints en `src/pages/`, funciones puras en `sitemap.ts`). Las URL absolutas salen siempre de `site`; en los tests solo se comprueba la ruta en el servidor de pruebas, nunca se pide nada a `agencymac.com`.
 
 ## Reglas
 

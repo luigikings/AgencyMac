@@ -12,7 +12,7 @@ test.describe("Locale routing without JavaScript", () => {
       expect(response?.status()).toBe(200);
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        t(locale, "home.heading"),
+        t(locale, "hero.heading"),
       );
     });
   }
@@ -61,7 +61,7 @@ test.describe("Language link without JavaScript", () => {
   test("/ → English → back to Spanish", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      t("es", "home.heading"),
+      t("es", "hero.heading"),
     );
 
     await page
@@ -71,7 +71,7 @@ test.describe("Language link without JavaScript", () => {
     await expect(page).toHaveURL(/\/en\/$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      t("en", "home.heading"),
+      t("en", "hero.heading"),
     );
 
     await page
@@ -81,7 +81,7 @@ test.describe("Language link without JavaScript", () => {
     expect(new URL(page.url()).pathname).toBe("/");
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      t("es", "home.heading"),
+      t("es", "hero.heading"),
     );
   });
 });
@@ -102,7 +102,7 @@ test.describe("Browser language is ignored", () => {
     expect(new URL(page.url()).pathname).toBe("/");
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      t("es", "home.heading"),
+      t("es", "hero.heading"),
     );
   });
 });

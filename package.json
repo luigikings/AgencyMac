@@ -17,7 +17,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run && node scripts/check-browser.mjs && playwright test",
     "quality": "node scripts/check-browser.mjs && pnpm --filter web build && pnpm --filter web quality",
-    "smoke": "node scripts/staging/smoke.mjs"
+    "smoke": "node scripts/staging/smoke.mjs",
+    "assets:build": "node scripts/assets/build-derivatives.mjs",
+    "assets:check": "node scripts/assets/build-derivatives.mjs --check"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -32,6 +34,7 @@
     "globals": "17.13.0",
     "prettier": "3.9.9",
     "prettier-plugin-astro": "1.1.0",
+    "sharp": "0.35.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
     "vitest": "5.0.3",

@@ -1,0 +1,58 @@
+---
+import { t, type Locale } from "../../lib/i18n";
+import CtaButton from "../CtaButton.astro";
+
+// RF-9, RF-10: the target of "Quiero despegar". Until the form exists (spec
+// 006) it says so openly; spec 006 puts the form inside this section.
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<section id="contact" class="contact" aria-labelledby="contact-heading">
+  <div class="contact__inner">
+    <h2 id="contact-heading">{t(locale, "contact.heading")}</h2>
+    <p class="contact__body">{t(locale, "contact.body")}</p>
+    <p class="contact__status">{t(locale, "contact.status")}</p>
+    <CtaButton locale={locale} />
+  </div>
+</section>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .contact {
+    background: var(--color-bg);
+  }
+
+  .contact__inner {
+    box-sizing: border-box;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1rem 4rem;
+  }
+
+  .contact h2 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.75rem, 6vw, 2.75rem);
+  }
+
+  .contact__body {
+    margin: 0 0 1.5rem;
+    max-width: 40rem;
+    font-size: 1.125rem;
+  }
+
+  .contact__status {
+    display: inline-block;
+    margin: 0 0 1.5rem;
+    margin-right: 1rem;
+    padding: 0.3rem 1rem;
+    border: 2px solid var(--color-button-hover);
+    border-radius: 999px;
+    color: var(--color-button-hover);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+  }
+</style>

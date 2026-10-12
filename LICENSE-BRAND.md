@@ -31,9 +31,16 @@ Estos elementos se incluyen en el repositorio únicamente para que el proyecto f
 - Reutilizar el código bajo la licencia MIT, siempre que sustituyas la marca, la mascota, los logos, las ilustraciones y los textos por los tuyos.
 - Mencionar o enlazar el proyecto por su nombre para referirte a él (por ejemplo, en un artículo o en una reseña), sin dar a entender patrocinio ni relación con la agencia.
 
+Esta reserva alcanza también a los derivados de esos elementos que contiene el repositorio: los recortes y versiones optimizadas de Mac, de la Luna y de los planetas, los logos recortados, los iconos y la imagen para redes sociales. Su procedencia está en `apps/web/src/assets/brand/README.md`. Los originales no se publican.
+
 ## Elementos de terceros
 
-Las tipografías, librerías y otros recursos de terceros que use el proyecto mantienen sus propias licencias, que prevalecen sobre este documento en lo que les afecte.
+Las tipografías, librerías y otros recursos de terceros que use el proyecto mantienen sus propias licencias, que prevalecen sobre este documento en lo que les afecte:
+
+- **Lilita One y Lato** (tipografías): SIL Open Font License 1.1, con su texto en `apps/web/src/assets/fonts/`.
+- **GSAP** (y su plugin ScrollTrigger): licencia propia de GreenSock, gratuita también en uso comercial. Se incorpora en la fase de animación de la spec 004; entonces se anotan aquí su identificador y su enlace exactos.
+- **Lenis**: licencia MIT.
+- **sharp**: licencia Apache-2.0. Solo se usa en los scripts que generan las imágenes derivadas, no viaja en la web.
 
 ---
 

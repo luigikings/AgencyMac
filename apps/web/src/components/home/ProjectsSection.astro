@@ -1,0 +1,133 @@
+---
+import earth from "../../assets/brand/planet-earth.webp";
+import { t, type Locale } from "../../lib/i18n";
+import { PROJECTS } from "../../lib/site-data";
+import BrandPicture from "../BrandPicture.astro";
+
+// RF-6, RF-7: two real projects with an external link each. No screenshots:
+// the only image is the decorative Earth next to the heading.
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<section id="projects" class="projects" aria-labelledby="projects-heading">
+  <div class="projects__inner">
+    <div class="projects__intro">
+      <h2 id="projects-heading">{t(locale, "projects.heading")}</h2>
+      <p>{t(locale, "projects.intro")}</p>
+      <BrandPicture
+        src={earth}
+        alt=""
+        widths={[160, 240, 320]}
+        sizes="10rem"
+        class="projects__earth"
+      />
+    </div>
+    <div class="projects__list">
+      {PROJECTS.map((project) => (
+        <article class="project">
+          <h3>{project.name}</h3>
+          <p>{t(locale, project.descriptionKey)}</p>
+          <a href={project.url} target="_blank" rel="noopener">
+            {t(locale, "projects.visit")} {project.domain}
+            <span class="project__notice">{t(locale, "projects.newTab")}</span>
+          </a>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .projects {
+    /* The decorative Earth may poke out of the box: clip it here. */
+    overflow: clip;
+    background: var(--color-bg);
+  }
+
+  .projects__inner {
+    box-sizing: border-box;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1rem;
+  }
+
+  .projects__intro {
+    position: relative;
+    margin-bottom: 2rem;
+    padding-right: 7rem;
+  }
+
+  .projects__intro h2 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.75rem, 6vw, 2.75rem);
+  }
+
+  .projects__intro p {
+    margin: 0;
+    font-size: 1.125rem;
+  }
+
+  .projects__intro :global(.projects__earth) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5rem;
+    height: auto;
+  }
+
+  .projects__list {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .project {
+    padding: 1.5rem;
+    border: 2px solid var(--color-accent-green);
+    border-radius: 1rem;
+    background: var(--color-bg-dark);
+  }
+
+  .project h3 {
+    margin: 0 0 0.5rem;
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    font-weight: 400;
+    line-height: 1.15;
+  }
+
+  .project p {
+    margin: 0 0 1rem;
+    font-size: 1.125rem;
+  }
+
+  .project a {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .project__notice {
+    margin-left: 0.4rem;
+    font-weight: 400;
+  }
+
+  @media (min-width: 48rem) {
+    .projects__intro {
+      /* Tall enough for the Earth, so it never touches the cards. */
+      min-height: 8rem;
+      padding-right: 11rem;
+    }
+
+    .projects__intro :global(.projects__earth) {
+      width: 8rem;
+    }
+
+    .projects__list {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

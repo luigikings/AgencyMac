@@ -146,3 +146,32 @@ test("the build leaves dist/en/404.html and no dist/en/404/ folder", () => {
 
 // The axe audit of the 404s (RF-20, RF-25) lives in a11y.spec.ts with the
 // other pages.
+
+// T7 (spec 004): the full-width home layout must not change the 404s. They
+// keep one column, no navigation, no language link and no call to action.
+test.describe("404 pages keep their one-column layout", () => {
+  for (const { path, locale } of pages.filter(
+    (page) => page.kind === "notFound",
+  )) {
+    test(`${path}: narrow main, no navigation, language link or CTA`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      const main = await page.locator("main").evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { maxWidth: style.maxWidth, paddingLeft: style.paddingLeft };
+      });
+      expect(main.maxWidth).toBe("960px");
+      expect(main.paddingLeft).toBe("16px");
+      await expect(page.locator("nav")).toHaveCount(0);
+      const header = page.getByRole("banner");
+      await expect(
+        header.getByRole("link", { name: t(locale, "nav.switchLanguage") }),
+      ).toHaveCount(0);
+      await expect(
+        header.getByRole("link", { name: t(locale, "cta.takeOff") }),
+      ).toHaveCount(0);
+      await expect(header.locator('a[href^="#"]')).toHaveCount(1); // skip link
+    });
+  }
+});

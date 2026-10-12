@@ -1,23 +1,101 @@
 import { expect, test } from "@playwright/test";
+import { t } from "../src/lib/i18n";
 import { homePages, pages } from "./pages";
 
 test.describe("Brand assets", () => {
-  // RF-22: the declared favicon is an SVG served by the site.
+  // RF-20: the declared favicon is an SVG served by the site (the same
+  // address and type as before the isologo).
   for (const { path } of homePages) {
     test(`${path}: the declared favicon responds 200 as SVG`, async ({
       page,
       request,
     }) => {
       await page.goto(path);
-      const icon = page.locator('link[rel="icon"]');
+      const icon = page.locator('link[rel="icon"][type="image/svg+xml"]');
       await expect(icon).toHaveCount(1);
-      await expect(icon).toHaveAttribute("type", "image/svg+xml");
       const href = await icon.getAttribute("href");
-      expect(href).toBeTruthy();
+      expect(href).toBe("/favicon.svg");
       const response = await request.get(new URL(href!, page.url()).href);
       expect(response.status()).toBe(200);
       expect(response.headers()["content-type"]).toBe("image/svg+xml");
       expect(await response.text()).toContain("<svg");
+    });
+  }
+
+  // RF-20: the three declared icons (SVG, PNG and Apple) respond 200 with
+  // their type, on every page.
+  for (const { path } of pages) {
+    test(`${path}: SVG, PNG and Apple icons are declared and served`, async ({
+      page,
+      request,
+    }) => {
+      await page.goto(path);
+      const declared = await page
+        .locator('link[rel="icon"], link[rel="apple-touch-icon"]')
+        .evaluateAll((links) =>
+          links.map((link) => ({
+            rel: link.getAttribute("rel"),
+            type: link.getAttribute("type"),
+            sizes: link.getAttribute("sizes"),
+            href: link.getAttribute("href"),
+          })),
+        );
+      expect(declared).toEqual([
+        {
+          rel: "icon",
+          type: "image/svg+xml",
+          sizes: "any",
+          href: "/favicon.svg",
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "48x48",
+          href: "/favicon-48.png",
+        },
+        {
+          rel: "apple-touch-icon",
+          type: null,
+          sizes: "180x180",
+          href: "/apple-touch-icon.png",
+        },
+      ]);
+      const expectedTypes = ["image/svg+xml", "image/png", "image/png"];
+      for (const [index, icon] of declared.entries()) {
+        const response = await request.get(
+          new URL(icon.href!, page.url()).href,
+        );
+        expect(response.status(), icon.href!).toBe(200);
+        expect(response.headers()["content-type"], icon.href!).toBe(
+          expectedTypes[index],
+        );
+      }
+    });
+  }
+});
+
+// RF-16: the header shows the real logo (not the written name), inside the
+// link to the home page, with real alt text, declared size and eager loading.
+// The 404s use it too.
+test.describe("Header logo", () => {
+  for (const { path, locale } of pages) {
+    test(`${path}: logo image in the home link`, async ({ page }) => {
+      await page.goto(path);
+      const brand = page
+        .getByRole("banner")
+        .getByRole("link", { name: t(locale, "nav.home") });
+      const logo = brand.locator("img");
+      await expect(logo).toHaveCount(1);
+      await expect(logo).toHaveAttribute("alt", t(locale, "nav.home"));
+      await expect(logo).toHaveAttribute("width", /^\d+$/);
+      await expect(logo).toHaveAttribute("height", /^\d+$/);
+      expect(await logo.getAttribute("loading")).not.toBe("lazy");
+      // The written brand name is no longer the link content.
+      await expect(brand).not.toHaveText(/\S/);
+      const loaded = await logo.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      );
+      expect(loaded).toBe(true);
     });
   }
 });

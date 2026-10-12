@@ -22,6 +22,8 @@ const MIN_SCORE = 0.9;
 // Core Web Vitals (RNF-2), asserted on the median run of each URL.
 const MAX_LCP_MS = 2500;
 const MAX_CLS = 0.1;
+// Total blocking time (the lab indicator of INP), spec 004: at most 200 ms.
+const MAX_TBT_MS = 200;
 const assertCategory = [
   "error",
   { minScore: MIN_SCORE, aggregationMethod: "median-run" },
@@ -54,6 +56,10 @@ module.exports = {
         "cumulative-layout-shift": [
           "error",
           { maxNumericValue: MAX_CLS, aggregationMethod: "median-run" },
+        ],
+        "total-blocking-time": [
+          "error",
+          { maxNumericValue: MAX_TBT_MS, aggregationMethod: "median-run" },
         ],
         // RF-19: text stays visible while brand fonts load. In Lighthouse
         // 12.6.1 the scored audit is `font-display` (`font-display-insight`

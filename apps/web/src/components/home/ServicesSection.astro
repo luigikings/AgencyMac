@@ -1,0 +1,155 @@
+---
+import type { ImageMetadata } from "astro";
+import { t, type Locale } from "../../lib/i18n";
+import { SERVICES } from "../../lib/site-data";
+import { cssVariableName } from "../../styles/tokens";
+import BrandPicture from "../BrandPicture.astro";
+
+// RF-4, RF-19: three planets, each one a band of solid colour from edge to
+// edge (no gradients under text, so every contrast can be calculated). The
+// colour comes from the planet's token; nothing here depends on JavaScript.
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+// Planet images are imported all at once; the data names which one to use.
+const images = import.meta.glob<{ default: ImageMetadata }>(
+  "../../assets/brand/planet-*.webp",
+  { eager: true },
+);
+const imageOf = (name: string) => {
+  const found = images[`../../assets/brand/${name}.webp`];
+  if (!found) throw new Error(`Missing planet image: ${name}`);
+  return found.default;
+};
+---
+
+<section id="services" class="services" aria-labelledby="services-heading">
+  <div class="services__intro">
+    <h2 id="services-heading">{t(locale, "services.heading")}</h2>
+    <p>{t(locale, "services.intro")}</p>
+  </div>
+  {SERVICES.map((service, index) => (
+    <article
+      class:list={["service", { "service--flip": index % 2 === 1 }]}
+      data-planet={service.id}
+      style={`background:var(${cssVariableName(service.bgToken)})`}
+    >
+      <div class="service__inner">
+        <div class="service__art">
+          <BrandPicture
+            src={imageOf(service.image)}
+            alt={t(locale, service.altKey)}
+            widths={[320, 480, 640]}
+            sizes="(min-width: 48rem) 20rem, 80vw"
+            class="service__image"
+          />
+        </div>
+        <div class="service__text">
+          <p class="service__tag">{t(locale, service.tagKey)}</p>
+          <h3>{service.name}</h3>
+          <p class="service__role">{t(locale, service.roleKey)}</p>
+          <p class="service__body">{t(locale, service.bodyKey)}</p>
+        </div>
+      </div>
+    </article>
+  ))}
+</section>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .services {
+    background: var(--color-bg);
+  }
+
+  .services__intro {
+    box-sizing: border-box;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1rem 2rem;
+  }
+
+  .services__intro h2 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.75rem, 6vw, 2.75rem);
+  }
+
+  .services__intro p {
+    margin: 0;
+    max-width: 40rem;
+    font-size: 1.125rem;
+  }
+
+  .service__inner {
+    box-sizing: border-box;
+    display: grid;
+    gap: 1.5rem;
+    align-items: center;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 2.5rem 1rem;
+  }
+
+  /* The picture is the grid item's content: the wrapper centres and orders it. */
+  .service__art {
+    justify-self: center;
+    width: 100%;
+    max-width: 20rem;
+  }
+
+  .service__art :global(.service__image) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .service__tag {
+    display: inline-block;
+    margin: 0 0 0.75rem;
+    padding: 0.2rem 0.75rem;
+    border: 2px solid var(--color-accent-green);
+    border-radius: 999px;
+    color: var(--color-accent-green);
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .service[data-planet="adara"] .service__tag {
+    border-color: var(--color-button-hover);
+    color: var(--color-button-hover);
+  }
+
+  .service h3 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 7vw, 3rem);
+    font-weight: 400;
+    line-height: 1.1;
+  }
+
+  .service__role {
+    margin: 0.25rem 0 1rem;
+    color: var(--color-button-hover);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+  }
+
+  .service__body {
+    margin: 0;
+    font-size: 1.125rem;
+  }
+
+  @media (min-width: 48rem) {
+    .service__inner {
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+    }
+
+    /* Alternate the side of the planet: image left, then right, then left. */
+    .service--flip .service__art {
+      order: 2;
+    }
+  }
+</style>

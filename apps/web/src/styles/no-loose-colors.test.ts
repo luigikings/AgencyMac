@@ -9,6 +9,8 @@ import { findHexColors } from "../lib/hex-colors";
 // this test fail, listing "file: hex".
 const WEB_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SOURCE_EXTENSIONS = /\.(astro|css|ts|js|mjs|svg)$/;
+const PUBLIC_TEXT_EXTENSIONS =
+  /\.(astro|css|ts|js|mjs|svg|json|webmanifest|xml|txt|html)$/;
 const EXCLUDED = new Set(["src/styles/tokens.ts"]);
 
 function toPosix(path: string): string {
@@ -26,7 +28,11 @@ function scannedFiles(): string[] {
   const sources = listFiles(join(WEB_ROOT, "src")).filter((file) =>
     SOURCE_EXTENSIONS.test(file),
   );
-  const publicFiles = listFiles(join(WEB_ROOT, "public"));
+  // Only text files: a binary image (PNG, WebP...) can contain a byte pattern
+  // that looks like a hex colour.
+  const publicFiles = listFiles(join(WEB_ROOT, "public")).filter((file) =>
+    PUBLIC_TEXT_EXTENSIONS.test(file),
+  );
   const config = join(WEB_ROOT, "astro.config.mjs");
   return [...sources, ...publicFiles, config]
     .map((file) => toPosix(relative(WEB_ROOT, file)))

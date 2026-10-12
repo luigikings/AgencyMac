@@ -1,0 +1,41 @@
+---
+import { t, type Locale } from "../lib/i18n";
+import { CTA_TARGET } from "../lib/site-data";
+
+// The "Quiero despegar" button: a link with the look of a button, in the
+// header and in the contact section. It is the only place spec 006 touches to
+// point it somewhere else.
+interface Props {
+  locale: Locale;
+  /** Where it goes; the contact section by default. */
+  href?: string;
+}
+
+const { locale, href = CTA_TARGET } = Astro.props;
+---
+
+<a class="cta" href={href}>
+  {t(locale, "cta.takeOff")}
+</a>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .cta {
+    display: inline-block;
+    box-sizing: border-box;
+    padding: 0.6rem 1.25rem;
+    border-radius: 999px;
+    background: var(--color-button);
+    color: var(--color-bg-dark);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .cta:hover,
+  .cta:focus-visible {
+    background: var(--color-button-hover);
+  }
+</style>

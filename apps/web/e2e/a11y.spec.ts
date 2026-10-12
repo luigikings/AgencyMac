@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { homePages, pages } from "./pages";
 
@@ -79,11 +79,12 @@ test.describe("Reduced motion", () => {
 });
 
 // Layout: on short pages the footer sits at the bottom of the window (the
-// purple main area fills the remaining height), with no vertical scroll.
+// purple main area fills the remaining height), with no vertical scroll. The
+// home pages are long since spec 004, so this only applies to the 404s.
 test.describe("Footer at the bottom on short pages", () => {
   test.use({ viewport: { width: 1280, height: 1000 } });
 
-  for (const { path } of pages) {
+  for (const { path } of pages.filter((page) => page.kind === "notFound")) {
     test(`${path}: footer reaches the bottom of the viewport`, async ({
       page,
     }) => {
@@ -99,5 +100,38 @@ test.describe("Footer at the bottom on short pages", () => {
         1,
       );
     });
+  }
+});
+
+// RNF-8, RF-38: axe on the home pages before and after walking the whole
+// page (so every lazy image has loaded and every section has been seen), with
+// the contrast rule really executed.
+async function revealAll(page: Page) {
+  await page.evaluate(async () => {
+    const step = Math.max(200, Math.floor(window.innerHeight / 2));
+    for (let y = 0; y <= document.body.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  });
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+test.describe("Accessibility after revealing the whole page", () => {
+  for (const { path } of homePages) {
+    for (const stage of ["before", "after"] as const) {
+      test(`${path}: axe ${stage} walking the page`, async ({ page }) => {
+        await page.goto(path);
+        if (stage === "after") await revealAll(page);
+        const results = await new AxeBuilder({ page }).analyze();
+        expect(results.violations).toEqual([]);
+        const ids = (list: { id: string }[]) => list.map(({ id }) => id);
+        expect(ids(results.passes)).toContain("color-contrast");
+        expect(ids(results.incomplete)).not.toContain("color-contrast");
+      });
+    }
   }
 });

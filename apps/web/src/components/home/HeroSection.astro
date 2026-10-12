@@ -1,0 +1,153 @@
+---
+import mac from "../../assets/brand/mac.webp";
+import moon from "../../assets/brand/moon.webp";
+import { t, type Locale } from "../../lib/i18n";
+import { DISCOVER_TARGET } from "../../lib/site-data";
+import BrandPicture from "../BrandPicture.astro";
+
+// First section (RF-2, RF-3). Everything is plain HTML on a solid background:
+// the only decoration is the halo behind the images, never under text.
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<section id="hero" class="hero" aria-labelledby="hero-heading">
+  <div class="hero__inner">
+    <div class="hero__text">
+      <p class="hero__kicker">{t(locale, "hero.kicker")}</p>
+      <h1 id="hero-heading">{t(locale, "hero.heading")}</h1>
+      <p class="hero__tagline">{t(locale, "hero.tagline")}</p>
+      <p class="hero__subtitle">{t(locale, "hero.subtitle")}</p>
+      <a class="hero__discover" href={DISCOVER_TARGET}>
+        {t(locale, "hero.discover")}
+      </a>
+    </div>
+    <div class="hero__art">
+      <div class="hero__halo" aria-hidden="true"></div>
+      <BrandPicture
+        src={moon}
+        alt=""
+        widths={[360, 540, 733]}
+        sizes="(min-width: 48rem) 28rem, 90vw"
+        priority
+        highPriority
+        class="hero__moon"
+      />
+      <BrandPicture
+        src={mac}
+        alt={t(locale, "hero.macAlt")}
+        widths={[240, 360, 540]}
+        sizes="(min-width: 48rem) 20rem, 64vw"
+        priority
+        highPriority
+        class="hero__mac"
+      />
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  .hero {
+    background: var(--color-bg);
+  }
+
+  .hero__inner {
+    box-sizing: border-box;
+    display: grid;
+    gap: 2rem;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+  }
+
+  .hero__kicker {
+    margin: 0 0 0.5rem;
+    color: var(--color-button-hover);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+  }
+
+  .hero h1 {
+    margin: 0 0 0.75rem;
+  }
+
+  .hero__tagline {
+    margin: 0 0 1rem;
+    color: var(--color-accent-green);
+    font-family: var(--font-heading);
+    font-size: clamp(1.25rem, 5vw, 1.75rem);
+    line-height: 1.2;
+  }
+
+  .hero__subtitle {
+    margin: 0 0 1.5rem;
+    font-size: 1.125rem;
+  }
+
+  .hero__discover {
+    display: inline-block;
+    box-sizing: border-box;
+    padding: 0.55rem 1.25rem;
+    border: 2px solid var(--color-button-hover);
+    border-radius: 999px;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    text-decoration: none;
+  }
+
+  .hero__discover:hover {
+    background: var(--color-bg-dark);
+  }
+
+  /* The art keeps a fixed square so nothing moves when the images arrive. */
+  .hero__art {
+    position: relative;
+    justify-self: center;
+    width: 100%;
+    max-width: 28rem;
+    aspect-ratio: 1 / 1;
+  }
+
+  .hero__halo {
+    position: absolute;
+    /* Fades out before the edge of the art box: it never spills over. */
+    inset: 0;
+    background: radial-gradient(
+      circle closest-side,
+      color-mix(in srgb, var(--color-button-hover) 22%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  .hero__art :global(.hero__moon),
+  .hero__art :global(.hero__mac) {
+    position: absolute;
+    height: auto;
+  }
+
+  .hero__art :global(.hero__moon) {
+    top: 0;
+    right: 0;
+    width: 78%;
+  }
+
+  .hero__art :global(.hero__mac) {
+    bottom: 0;
+    left: 0;
+    width: 68%;
+  }
+
+  @media (min-width: 48rem) {
+    .hero__inner {
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items: center;
+      padding-top: 3rem;
+      padding-bottom: 4rem;
+    }
+  }
+</style>

@@ -4,13 +4,17 @@ import { SITE_NAME, buildPageTitle } from "../../apps/web/src/lib/site.ts";
 import {
   ERROR_TITLES,
   SMOKE_CHECKS,
+  declaredIcons,
   evaluateResponse,
   extractFaviconUrl,
   extractFontUrls,
+  extractSocialAssetPaths,
   extractStylesheetUrls,
   faviconCheck,
   fontCheck,
   formatFailure,
+  iconCheck,
+  imageCheck,
   relativize,
   stagingUrl,
   waitForVersion,
@@ -115,6 +119,8 @@ describe("SMOKE_CHECKS (table of section 5)", () => {
       "/Favicon.svg",
       "/_headers",
       "/_redirects",
+      "/sitemap.xml",
+      "/robots.txt",
     ]);
   });
 
@@ -460,6 +466,190 @@ describe("extractors", () => {
   it("extracts the stylesheets", () => {
     expect(extractStylesheetUrls(head)).toEqual(["/_astro/index.css"]);
     expect(extractStylesheetUrls("<title>x</title>")).toEqual([]);
+  });
+});
+
+// Spec 004, T14: the smoke test also covers the sitemap, robots.txt, the icons
+// declared by the pages and the social and logo images. The icon and image
+// paths come from the HTML of "/" and "/en/", never from agencymac.com.
+describe("sitemap.xml and robots.txt checks", () => {
+  it("expects 200, the right type and noindex on staging", () => {
+    expect(checkFor("/sitemap.xml")).toEqual({
+      path: "/sitemap.xml",
+      status: 200,
+      contentType: "application/xml",
+      noindex: true,
+    });
+    expect(checkFor("/robots.txt")).toEqual({
+      path: "/robots.txt",
+      status: 200,
+      contentType: "text/plain",
+      noindex: true,
+    });
+  });
+
+  it.each(["/sitemap.xml", "/robots.txt"])(
+    "%s passes with a good response",
+    (path) => {
+      const check = checkFor(path);
+      expect(evaluateResponse(check, goodResponse(check), context)).toEqual({
+        ok: true,
+        failures: [],
+      });
+    },
+  );
+
+  it.each([
+    [
+      "/sitemap.xml",
+      { status: 404, headers: { ...noindex }, body: "" },
+      [
+        "/sitemap.xml: expected status 200, got 404",
+        '/sitemap.xml: expected content type "application/xml", got (none)',
+      ],
+    ],
+    [
+      "/sitemap.xml",
+      {
+        status: 200,
+        headers: { "content-type": "text/html" },
+        body: "<html></html>",
+      },
+      [
+        "/sitemap.xml: expected X-Robots-Tag noindex, got (none)",
+        '/sitemap.xml: expected content type "application/xml", got "text/html"',
+      ],
+    ],
+    [
+      "/robots.txt",
+      {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+        body: "User-agent: *",
+      },
+      ["/robots.txt: expected X-Robots-Tag noindex, got (none)"],
+    ],
+  ])("%s fails with a bad response", (path, response, expected) => {
+    expect(
+      evaluateResponse(checkFor(path), response, context).failures,
+    ).toEqual(expected);
+  });
+});
+
+describe("declared icons", () => {
+  const head =
+    '<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">' +
+    '<link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">' +
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">' +
+    '<link rel="canonical" href="https://agencymac.com/">';
+
+  it("lists the SVG, PNG and Apple icons with their expected type", () => {
+    expect(declaredIcons(head)).toEqual([
+      { href: "/favicon.svg", contentType: "image/svg+xml" },
+      { href: "/favicon-48.png", contentType: "image/png" },
+      { href: "/apple-touch-icon.png", contentType: "image/png" },
+    ]);
+  });
+
+  it("returns an empty list without icons", () => {
+    expect(declaredIcons("<title>x</title>")).toEqual([]);
+  });
+
+  it("builds a check that wants 200, the type and noindex", () => {
+    expect(iconCheck("/favicon-48.png", "image/png")).toEqual({
+      path: "/favicon-48.png",
+      status: 200,
+      contentType: "image/png",
+      noindex: true,
+    });
+    expect(faviconCheck("/favicon.svg")).toEqual(
+      iconCheck("/favicon.svg", "image/svg+xml"),
+    );
+  });
+
+  it("fails an icon served with another type", () => {
+    const result = evaluateResponse(
+      iconCheck("/apple-touch-icon.png", "image/png"),
+      {
+        status: 200,
+        headers: { "content-type": "text/html", ...noindex },
+        body: "<html></html>",
+      },
+      context,
+    );
+    expect(result.failures).toEqual([
+      '/apple-touch-icon.png: expected content type "image/png", got "text/html"',
+    ]);
+  });
+});
+
+describe("social and logo images", () => {
+  const og = (url) => `<meta property="og:image" content="${url}">`;
+  const ld = (logo) =>
+    `<script type="application/ld+json">{"@type":"Organization","logo":"${logo}"}</script>`;
+
+  it("takes only the path of og:image and of the JSON-LD logo", () => {
+    const head =
+      og("https://agencymac.com/og-default.png") +
+      ld("https://agencymac.com/logo-512.png");
+    expect(extractSocialAssetPaths(head)).toEqual([
+      "/og-default.png",
+      "/logo-512.png",
+    ]);
+  });
+
+  it("never returns the host of the production domain", () => {
+    const paths = extractSocialAssetPaths(
+      og("https://agencymac.com/og-default.png"),
+    );
+    expect(paths.join("")).not.toContain("agencymac.com");
+  });
+
+  it("does not repeat a path", () => {
+    const head =
+      og("https://agencymac.com/logo-512.png") +
+      ld("https://agencymac.com/logo-512.png");
+    expect(extractSocialAssetPaths(head)).toEqual(["/logo-512.png"]);
+  });
+
+  it("returns an empty list without them, or with broken JSON-LD", () => {
+    expect(extractSocialAssetPaths("<title>x</title>")).toEqual([]);
+    expect(
+      extractSocialAssetPaths(
+        '<script type="application/ld+json">{not json</script>',
+      ),
+    ).toEqual([]);
+  });
+
+  it("builds a check that wants a 200 PNG with noindex", () => {
+    expect(imageCheck("/og-default.png")).toEqual({
+      path: "/og-default.png",
+      status: 200,
+      contentType: "image/png",
+      noindex: true,
+    });
+  });
+
+  it("passes a good response and fails a bad one without printing the host", () => {
+    const check = imageCheck("/og-default.png");
+    expect(
+      evaluateResponse(
+        check,
+        {
+          status: 200,
+          headers: { "content-type": "image/png", ...noindex },
+          body: "binary",
+        },
+        context,
+      ),
+    ).toEqual({ ok: true, failures: [] });
+    const bad = evaluateResponse(
+      check,
+      { status: 404, headers: {}, body: "not found" },
+      context,
+    );
+    expect(bad.ok).toBe(false);
+    expect(bad.failures.join("\n")).not.toContain(HOST);
   });
 });
 

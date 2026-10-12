@@ -11,13 +11,15 @@
 import { pathToFileURL } from "node:url";
 import {
   SMOKE_CHECKS,
+  declaredIcons,
   evaluateResponse,
-  extractFaviconUrl,
   extractFontUrls,
+  extractSocialAssetPaths,
   extractStylesheetUrls,
-  faviconCheck,
   fontCheck,
   formatFailure,
+  iconCheck,
+  imageCheck,
   relativize,
   stagingUrl,
   waitForVersion,
@@ -112,17 +114,31 @@ export async function runSmoke({ baseUrl, version, log = console.log }) {
     const response = await fetchOrFail(page);
     if (!response) continue;
     const pageUrl = new URL(page, baseUrl);
-    const favicon = extractFaviconUrl(response.body);
-    if (favicon)
-      assets.set(
-        relativize(new URL(favicon, pageUrl).href, baseUrl),
-        faviconCheck,
+    // Every declared icon (SVG, PNG and Apple) must be served with its type.
+    const icons = declaredIcons(response.body);
+    for (const { href, contentType } of icons) {
+      assets.set(relativize(new URL(href, pageUrl).href, baseUrl), (path) =>
+        iconCheck(path, contentType),
       );
-    else
+    }
+    if (icons.length === 0)
       failures.push(
         formatFailure({
           path: page,
           expected: "a declared favicon",
+          actual: "(none)",
+        }),
+      );
+
+    // The social image and the logo of the structured data: their absolute
+    // URLs name the production domain, so only the path is requested here.
+    const socialPaths = extractSocialAssetPaths(response.body);
+    for (const path of socialPaths) assets.set(path, imageCheck);
+    if (socialPaths.length === 0)
+      failures.push(
+        formatFailure({
+          path: page,
+          expected: "a social image (og:image)",
           actual: "(none)",
         }),
       );

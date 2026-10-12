@@ -4,7 +4,7 @@ import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import type { Locale } from "../lib/i18n";
 import { SITE_NAME, buildPageTitle } from "../lib/site";
-import { alternateLinks, canonicalUrl } from "../lib/seo";
+import { alternateLinks, canonicalUrl, type SocialMetaTag } from "../lib/seo";
 import { colors, fontPreloads, fonts, tokensToCss } from "../styles/tokens";
 
 interface Props {
@@ -17,6 +17,16 @@ interface Props {
   seo: { path: string } | null;
   /** Show the link to the other language in the header (false on the 404s). */
   showLanguageSwitch?: boolean;
+  /**
+   * Full-width main (home page): no max-width and no padding, so each
+   * section draws its own band edge to edge. False keeps the one-column
+   * main of the 404s.
+   */
+  fullWidth?: boolean;
+  /** Open Graph and Twitter tags (home pages only). */
+  social?: SocialMetaTag[];
+  /** Serialized JSON-LD for a `application/ld+json` block (home pages only). */
+  jsonLd?: string;
 }
 
 const {
@@ -25,6 +35,9 @@ const {
   description,
   seo,
   showLanguageSwitch = true,
+  fullWidth = false,
+  social = [],
+  jsonLd,
 } = Astro.props;
 
 if (!Astro.site) {
@@ -46,7 +59,19 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
     {alternates.map(({ hreflang, href }) => (
       <link rel="alternate" hreflang={hreflang} href={href} />
     ))}
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {social.map(({ attr, key, content }) =>
+      attr === "property" ? (
+        <meta property={key} content={content} />
+      ) : (
+        <meta name={key} content={content} />
+      ),
+    )}
+    {jsonLd && (
+      <script is:inline type="application/ld+json" set:html={jsonLd} />
+    )}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     {/* RF-18/RF-19: self-hosted @font-face (swap) + metric-adjusted fallbacks. */}
     <Font
       cssVariable={fonts.heading.cssVariable}
@@ -60,7 +85,7 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
   </head>
   <body>
     <SiteHeader locale={locale} showLanguageSwitch={showLanguageSwitch} />
-    <main id="content">
+    <main id="content" class:list={{ "main--full": fullWidth }}>
       <slot />
     </main>
     <SiteFooter locale={locale} />
@@ -94,6 +119,11 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
     max-width: 60rem;
     margin: 0 auto;
     padding: 2rem 1rem;
+  }
+
+  main.main--full {
+    max-width: none;
+    padding: 0;
   }
 
   h1,

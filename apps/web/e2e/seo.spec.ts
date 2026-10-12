@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { localizePath, t } from "../src/lib/i18n";
 import { SITE_NAME, buildPageTitle } from "../src/lib/site";
 import { SITE_URL, homePages, pages } from "./pages";
@@ -57,7 +57,7 @@ test.describe("Indexable pages: minimum SEO", () => {
       await page.goto(path);
       const h1 = page.getByRole("heading", { level: 1 });
       await expect(h1).toHaveCount(1);
-      await expect(h1).toHaveText(t(locale, "home.heading"));
+      await expect(h1).toHaveText(t(locale, "hero.heading"));
       const levels = await page
         .locator("h1, h2, h3, h4, h5, h6")
         .evaluateAll((headings) =>
@@ -69,9 +69,9 @@ test.describe("Indexable pages: minimum SEO", () => {
       }
       const main = page.locator("main#content");
       await expect(main).toHaveCount(1);
-      await expect(main).toContainText(t(locale, "home.intro"));
-      await expect(main).toContainText(t(locale, "home.sectionHeading"));
-      await expect(main).toContainText(t(locale, "home.sectionBody"));
+      await expect(main).toContainText(t(locale, "hero.tagline"));
+      await expect(main).toContainText(t(locale, "services.heading"));
+      await expect(main).toContainText(t(locale, "services.intro"));
     });
   }
 
@@ -136,15 +136,145 @@ test.describe("Indexable pages: minimum SEO", () => {
   });
 });
 
-// RF-15 and RNF-3 on every page: never noindex, never a script.
+// RF-15 and RNF-3 on every page: never noindex, and no executable script. The
+// home pages carry one JSON-LD block (data, not code); the 404s none.
 test.describe("All pages", () => {
-  for (const { path } of pages) {
-    test(`${path}: no noindex and no scripts`, async ({ page }) => {
+  for (const { path, kind } of pages) {
+    test(`${path}: no noindex and no executable scripts`, async ({ page }) => {
       const response = await page.goto(path);
       expect(response?.headers()["x-robots-tag"]).toBeUndefined();
       await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
       await expect(page.locator('meta[name="googlebot"]')).toHaveCount(0);
-      await expect(page.locator("script")).toHaveCount(0);
+      const types = await page
+        .locator("script")
+        .evaluateAll((scripts) =>
+          scripts.map((script) => script.getAttribute("type")),
+        );
+      expect(types).toEqual(kind === "home" ? ["application/ld+json"] : []);
     });
   }
+});
+
+// RF-27: social metadata in the language of the page, absolute URLs built
+// from the site, and an image that the server under test really serves.
+const meta = (page: Page, attr: "property" | "name", key: string) =>
+  page.locator(`meta[${attr}="${key}"]`);
+
+test.describe("Social metadata (RF-27)", () => {
+  for (const { path, locale, canonicalPath } of homePages) {
+    test(`${path}: Open Graph and Twitter tags`, async ({ page, request }) => {
+      await page.goto(path);
+      const title = buildPageTitle(SITE_NAME, t(locale, "home.title"));
+      const description = t(locale, "home.description");
+      const expected: ["property" | "name", string, string][] = [
+        ["property", "og:type", "website"],
+        ["property", "og:site_name", SITE_NAME],
+        ["property", "og:title", title],
+        ["property", "og:description", description],
+        ["property", "og:url", `${SITE_URL}${canonicalPath}`],
+        ["property", "og:locale", locale === "es" ? "es_ES" : "en_US"],
+        ["property", "og:image", `${SITE_URL}/og-default.png`],
+        ["property", "og:image:width", "1200"],
+        ["property", "og:image:height", "630"],
+        ["property", "og:image:alt", t(locale, "og.imageAlt")],
+        ["name", "twitter:card", "summary_large_image"],
+        ["name", "twitter:title", title],
+        ["name", "twitter:description", description],
+        ["name", "twitter:image", `${SITE_URL}/og-default.png`],
+        ["name", "twitter:image:alt", t(locale, "og.imageAlt")],
+      ];
+      for (const [attr, key, content] of expected) {
+        const tag = meta(page, attr, key);
+        await expect(tag, key).toHaveCount(1);
+        await expect(tag, key).toHaveAttribute("content", content);
+      }
+      // The other language is offered as an alternative locale.
+      await expect(
+        meta(page, "property", "og:locale:alternate"),
+      ).toHaveAttribute("content", locale === "es" ? "en_US" : "es_ES");
+      // The image is served by the site under test (its absolute URL points
+      // at the production domain, which these tests never request).
+      const image = new URL(
+        (await meta(page, "property", "og:image").getAttribute("content"))!,
+      );
+      const response = await request.get(image.pathname);
+      expect(response.status()).toBe(200);
+      expect(response.headers()["content-type"]).toBe("image/png");
+    });
+  }
+
+  for (const { path } of pages.filter((p) => p.kind === "notFound")) {
+    test(`${path}: no social metadata on the 404`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator('meta[property^="og:"]')).toHaveCount(0);
+      await expect(page.locator('meta[name^="twitter:"]')).toHaveCount(0);
+    });
+  }
+});
+
+// RF-28: Organization data that matches what the page says.
+test.describe("Structured data (RF-28)", () => {
+  for (const { path, locale } of homePages) {
+    test(`${path}: JSON-LD Organization`, async ({ page, request }) => {
+      await page.goto(path);
+      const raw = await page
+        .locator('script[type="application/ld+json"]')
+        .textContent();
+      const data = JSON.parse(raw!);
+      expect(data["@context"]).toBe("https://schema.org");
+      expect(data["@type"]).toBe("Organization");
+      expect(data.name).toBe(SITE_NAME);
+      expect(data.url).toBe(`${SITE_URL}/`);
+      expect(data.description).toBe(t(locale, "home.description"));
+      await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+        "content",
+        data.description,
+      );
+      expect(data.logo.startsWith(`${SITE_URL}/`)).toBe(true);
+      const logo = await request.get(new URL(data.logo).pathname);
+      expect(logo.status()).toBe(200);
+      for (const forbidden of ["telephone", "email", "address", "sameAs"]) {
+        expect(data, forbidden).not.toHaveProperty(forbidden);
+      }
+    });
+  }
+
+  for (const { path } of pages.filter((p) => p.kind === "notFound")) {
+    test(`${path}: no JSON-LD on the 404`, async ({ page }) => {
+      await page.goto(path);
+      await expect(
+        page.locator('script[type="application/ld+json"]'),
+      ).toHaveCount(0);
+    });
+  }
+});
+
+// RF-29, RF-30: sitemap and robots.txt, served by the site under test.
+test.describe("Sitemap and robots.txt (RF-29, RF-30)", () => {
+  test("sitemap.xml lists the two pages with their language alternatives", async ({
+    request,
+  }) => {
+    const response = await request.get("/sitemap.xml");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("xml");
+    const xml = await response.text();
+    const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([`${SITE_URL}/`, `${SITE_URL}/en/`]);
+    for (const hreflang of ["es", "en", "x-default"]) {
+      expect(xml).toContain(`hreflang="${hreflang}"`);
+    }
+    expect(xml).not.toContain("404");
+  });
+
+  test("robots.txt allows crawling and links to the sitemap", async ({
+    request,
+  }) => {
+    const response = await request.get("/robots.txt");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    const text = await response.text();
+    expect(text).toContain("Allow: /");
+    expect(text).not.toMatch(/disallow/i);
+    expect(text).toContain(`Sitemap: ${SITE_URL}/sitemap.xml`);
+  });
 });

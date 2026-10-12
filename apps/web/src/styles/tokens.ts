@@ -15,17 +15,28 @@ export const colors = {
   button: { value: "#FFC300", role: "Button" },
   buttonHover: {
     value: "#FFE000",
-    role: "Button on hover/focus (also the focus ring)",
+    role: "Button on hover/focus, focus ring and yellow accent text",
   },
   logoGradient1: { value: "#FF9D00", role: "Logo gradient, stop 1" },
   logoGradient2: { value: "#FF6700", role: "Logo gradient, stop 2" },
   logoGradient3: { value: "#FF5733", role: "Logo gradient, stop 3" },
   logoGradient4: { value: "#C70039", role: "Logo gradient, stop 4" },
   accentGreen: { value: "#DAF7A6", role: "Light green accent (links)" },
-  // PROVISIONAL: approximated at the user's request because there is no
-  // original logo file. Replace it with the exact value once that file exists.
-  logoCyan: { value: "#00E5FF", role: "Logo cyan (provisional)" },
   text: { value: "#FFFFFF", role: "Neutral: text on dark backgrounds" },
+  // Solid backgrounds of the service blocks (contrast checked in
+  // styles/contrast.test.ts). Proposed values, pending visual review.
+  planetHexawebBg: {
+    value: "#00505C",
+    role: "Hexaweb service block background (dark teal)",
+  },
+  planetRankiaBg: {
+    value: "#1F2A7A",
+    role: "Rankia service block background (indigo)",
+  },
+  planetAdaraBg: {
+    value: "#7A1A12",
+    role: "Adara service block background (dark red)",
+  },
 } as const satisfies Record<string, ColorToken>;
 
 export type ColorName = keyof typeof colors;

@@ -20,6 +20,10 @@ playwright-report/
 .wrangler/
 apps/web/.staging/
 
+# Original illustrations and logos (large, opaque backgrounds, never versioned).
+# Only the derivatives listed in scripts/assets/manifest.mjs are committed.
+/Assets/
+
 # Local-only settings and private notes
 .claude/settings.local.json
 MEMORY.local.md

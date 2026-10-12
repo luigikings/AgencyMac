@@ -84,10 +84,33 @@ export const SMOKE_CHECKS = [
   notFound("/Favicon.svg", "es"),
   { path: "/_headers", status: 404 },
   { path: "/_redirects", status: 404 },
+  // Spec 004: sitemap and robots.txt, also with noindex on staging.
+  {
+    path: "/sitemap.xml",
+    status: 200,
+    contentType: "application/xml",
+    noindex: true,
+  },
+  {
+    path: "/robots.txt",
+    status: 200,
+    contentType: "text/plain",
+    noindex: true,
+  },
 ];
 
+/** An icon or image the pages declare: 200, its type and noindex on staging. */
+export function iconCheck(path, contentType) {
+  return { path, status: 200, contentType, noindex: true };
+}
+
 export function faviconCheck(path) {
-  return { path, status: 200, contentType: "image/svg+xml", noindex: true };
+  return iconCheck(path, "image/svg+xml");
+}
+
+/** The social image and the logo of the structured data are PNG files. */
+export function imageCheck(path) {
+  return iconCheck(path, "image/png");
 }
 
 export function fontCheck(path) {
@@ -231,6 +254,50 @@ export function extractFontUrls(text) {
 
 export function extractFaviconUrl(html) {
   return links(html).find(({ rel }) => rel.includes("icon"))?.href ?? null;
+}
+
+// Every icon the page declares (rel "icon" and "apple-touch-icon") with the
+// type it must be served as: its `type` attribute, or PNG for the Apple icon.
+export function declaredIcons(html) {
+  return [...html.matchAll(/<link\b[^>]*>/gi)]
+    .map(([tag]) => ({
+      rel: (attribute(tag, "rel") ?? "").toLowerCase().split(/\s+/),
+      href: attribute(tag, "href"),
+      type: attribute(tag, "type"),
+    }))
+    .filter(
+      ({ rel, href }) =>
+        href && (rel.includes("icon") || rel.includes("apple-touch-icon")),
+    )
+    .map(({ href, type }) => ({
+      href,
+      contentType: type ?? "image/png",
+    }));
+}
+
+// Paths (never hosts) of the social image (og:image) and of the logo of the
+// JSON-LD. Their absolute URLs point at the production domain, which the
+// smoke test never requests: only the path is asked of the staging server.
+export function extractSocialAssetPaths(html) {
+  const urls = [];
+  for (const [tag] of html.matchAll(/<meta\b[^>]*>/gi)) {
+    if (attribute(tag, "property") === "og:image") {
+      urls.push(attribute(tag, "content"));
+    }
+  }
+  for (const [, json] of html.matchAll(
+    /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    try {
+      urls.push(JSON.parse(json).logo);
+    } catch {
+      // A broken block is simply not a source of paths.
+    }
+  }
+  const paths = urls
+    .filter((url) => typeof url === "string" && url !== "")
+    .map((url) => new URL(url, "https://placeholder.invalid").pathname);
+  return [...new Set(paths)];
 }
 
 export function extractStylesheetUrls(html) {

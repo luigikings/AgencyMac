@@ -1,9 +1,11 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import HomeContent from "../../components/HomeContent.astro";
+import { buildHomeSeo } from "../../lib/home-seo";
 import { localizePath, t, type Locale } from "../../lib/i18n";
 
 const locale: Locale = "en";
+const { social, jsonLd } = buildHomeSeo(Astro.site!, locale);
 ---
 
 <BaseLayout
@@ -11,6 +13,9 @@ const locale: Locale = "en";
   title={t(locale, "home.title")}
   description={t(locale, "home.description")}
   seo={{ path: localizePath(locale, "/") }}
+  social={social}
+  jsonLd={jsonLd}
+  fullWidth
 >
   <HomeContent locale={locale} />
 </BaseLayout>

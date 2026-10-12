@@ -1,12 +1,15 @@
 ---
+import logo from "../assets/brand/logo-white-letters.png";
 import { localizePath, otherLocale, t, type Locale } from "../lib/i18n";
-import { SITE_NAME } from "../lib/site";
+import { NAV_SECTIONS } from "../lib/site-data";
+import BrandPicture from "./BrandPicture.astro";
+import CtaButton from "./CtaButton.astro";
 
 interface Props {
   locale: Locale;
   /**
-   * Link to the same page in the other language. False on the 404s, where
-   * the nav (which only holds that link) is not rendered at all.
+   * Full header of the home page: section links, language link and the call
+   * to action. False on the 404s: only the logo (no nav landmark at all).
    */
   showLanguageSwitch: boolean;
 }
@@ -20,31 +23,41 @@ const target = otherLocale(locale);
     {t(locale, "a11y.skipToContent")}
   </a>
   <div class="site-header__inner">
-    <a
-      class="site-header__brand"
-      href={localizePath(locale, "/")}
-      aria-label={t(locale, "nav.home")}
-    >
-      {SITE_NAME}
+    <a class="site-header__brand" href={localizePath(locale, "/")}>
+      <BrandPicture
+        src={logo}
+        alt={t(locale, "nav.home")}
+        widths={[144, 288, 432]}
+        sizes="144px"
+        priority
+        class="site-header__logo"
+      />
     </a>
     {
-      /* The language link is the only nav entry for now. Without it (404s)
-         no empty navigation landmark is rendered: the brand link and the
-         page's own link already lead home. */
+      /* Without the language switch (404s) no navigation landmark is
+         rendered: the logo link and the page's own link lead home. */
       showLanguageSwitch && (
-        <nav aria-label={t(locale, "nav.label")}>
-          <ul class="site-header__links">
-            <li>
-              <a
-                href={localizePath(target, "/")}
-                hreflang={target}
-                lang={target}
-              >
-                {t(locale, "nav.switchLanguage")}
-              </a>
-            </li>
-          </ul>
-        </nav>
+        <>
+          <nav class="site-header__nav" aria-label={t(locale, "nav.label")}>
+            <ul class="site-header__links">
+              {NAV_SECTIONS.map((section) => (
+                <li>
+                  <a href={`#${section.id}`}>{t(locale, section.navKey)}</a>
+                </li>
+              ))}
+              <li>
+                <a
+                  href={localizePath(target, "/")}
+                  hreflang={target}
+                  lang={target}
+                >
+                  {t(locale, "nav.switchLanguage")}
+                </a>
+              </li>
+            </ul>
+          </nav>
+          <CtaButton locale={locale} />
+        </>
       )
     }
   </div>
@@ -69,18 +82,49 @@ const target = otherLocale(locale);
   }
 
   .site-header__brand {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    color: var(--color-text);
-    text-decoration: none;
+    display: block;
+    flex: none;
+    width: 9rem;
+    line-height: 0;
+  }
+
+  .site-header__brand :global(.site-header__logo) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* The nav takes the free space between the logo and the button; on narrow
+     screens it drops to its own row. */
+  .site-header__nav {
+    flex: 1 1 auto;
+    order: 3;
+    width: 100%;
   }
 
   .site-header__links {
     display: flex;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .site-header__links a {
+    display: inline-block;
+    padding: 0.25rem 0;
+  }
+
+  @media (min-width: 62rem) {
+    .site-header__nav {
+      order: 0;
+      width: auto;
+    }
+
+    .site-header__links {
+      justify-content: center;
+    }
   }
 
   /* Hidden until it receives keyboard focus. */

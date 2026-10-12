@@ -20,14 +20,26 @@ const EXPECTED = [
   ["bgDark", "#1D003F", /dark background/i, "--color-bg-dark"],
   ["bg", "#34006F", /^background/i, "--color-bg"],
   ["button", "#FFC300", /^button$/i, "--color-button"],
-  ["buttonHover", "#FFE000", /hover.*focus/i, "--color-button-hover"],
+  [
+    "buttonHover",
+    "#FFE000",
+    /hover.*focus.*focus ring.*yellow accent text/i,
+    "--color-button-hover",
+  ],
   ["logoGradient1", "#FF9D00", /logo gradient/i, "--color-logo-gradient-1"],
   ["logoGradient2", "#FF6700", /logo gradient/i, "--color-logo-gradient-2"],
   ["logoGradient3", "#FF5733", /logo gradient/i, "--color-logo-gradient-3"],
   ["logoGradient4", "#C70039", /logo gradient/i, "--color-logo-gradient-4"],
   ["accentGreen", "#DAF7A6", /light green accent/i, "--color-accent-green"],
-  ["logoCyan", "#00E5FF", /logo cyan.*provisional/i, "--color-logo-cyan"],
   ["text", "#FFFFFF", /text on dark backgrounds/i, "--color-text"],
+  [
+    "planetHexawebBg",
+    "#00505C",
+    /hexaweb.*block/i,
+    "--color-planet-hexaweb-bg",
+  ],
+  ["planetRankiaBg", "#1F2A7A", /rankia.*block/i, "--color-planet-rankia-bg"],
+  ["planetAdaraBg", "#7A1A12", /adara.*block/i, "--color-planet-adara-bg"],
 ] as const;
 
 describe("colors (RF-16)", () => {
@@ -39,6 +51,10 @@ describe("colors (RF-16)", () => {
     const token = colors[name];
     expect(token.value).toBe(value);
     expect(token.role).toMatch(role);
+  });
+
+  it("has no logo cyan token", () => {
+    expect(Object.keys(colors).some((name) => /cyan/i.test(name))).toBe(false);
   });
 
   it("keeps the logo gradient in its order", () => {

@@ -1,5 +1,10 @@
 ---
-import { t, type Locale } from "../lib/i18n";
+import type { Locale } from "../lib/i18n";
+import ContactSection from "./home/ContactSection.astro";
+import HeroSection from "./home/HeroSection.astro";
+import ProjectsSection from "./home/ProjectsSection.astro";
+import ServicesSection from "./home/ServicesSection.astro";
+import TeamSection from "./home/TeamSection.astro";
 
 interface Props {
   locale: Locale;
@@ -8,9 +13,8 @@ interface Props {
 const { locale } = Astro.props;
 ---
 
-<h1>{t(locale, "home.heading")}</h1>
-<p>{t(locale, "home.intro")}</p>
-<section aria-labelledby="home-section-heading">
-  <h2 id="home-section-heading">{t(locale, "home.sectionHeading")}</h2>
-  <p>{t(locale, "home.sectionBody")}</p>
-</section>
+<HeroSection locale={locale} />
+<ServicesSection locale={locale} />
+<ProjectsSection locale={locale} />
+<TeamSection locale={locale} />
+<ContactSection locale={locale} />
