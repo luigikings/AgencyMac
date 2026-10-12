@@ -754,6 +754,84 @@ for (const { path, locale } of homePages) {
       }
     });
 
+    // RF-36 (keyboard): Mac is a button only while the layer is active.
+    test("Tab reaches Mac, with a name, a role and a visible focus", async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await page.waitForSelector(READY, { timeout: 10_000 });
+      const mac = page.locator(GESTURE);
+      await expect(mac).toHaveAttribute("role", "button");
+      await expect(mac).toHaveAttribute("tabindex", "0");
+      await expect(mac).toHaveAttribute(
+        "aria-label",
+        t(locale, "hero.macGestureLabel"),
+      );
+      await mac.focus();
+      const focus = await mac.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          active: document.activeElement === el,
+          outlineStyle: style.outlineStyle,
+          outlineWidth: parseFloat(style.outlineWidth),
+        };
+      });
+      expect(focus.active).toBe(true);
+      expect(focus.outlineStyle).not.toBe("none");
+      expect(focus.outlineWidth).toBeGreaterThan(0);
+      // Tab from the previous link lands on Mac.
+      await page.locator(".hero__discover").focus();
+      await page.keyboard.press("Tab");
+      await expect(mac).toBeFocused();
+    });
+
+    for (const key of ["Enter", "Space"]) {
+      test(`${key} on Mac plays the 0.6 s gesture`, async ({ page }) => {
+        await page.goto(path);
+        await page.waitForSelector(READY, { timeout: 10_000 });
+        const textBefore = await page.locator("#hero").innerText();
+        await page.locator(GESTURE).focus();
+        await page.keyboard.press(key);
+        await expect(page.locator(GESTURE)).toHaveAttribute(
+          "data-mac-gesture",
+          "playing",
+          { timeout: 500 },
+        );
+        await expect(page.locator(GESTURE)).not.toHaveAttribute(
+          "data-mac-gesture",
+          /.+/,
+          { timeout: 2000 },
+        );
+        expect(await page.locator("#hero").innerText()).toBe(textBefore);
+      });
+    }
+
+    test("without the layer Mac has no role, focus stop or label", async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.goto(path);
+      await page.waitForTimeout(LOAD_DELAY_MS + 800);
+      const mac = page.locator(GESTURE);
+      await expect(mac).not.toHaveAttribute("role", /.*/);
+      await expect(mac).not.toHaveAttribute("tabindex", /.*/);
+      await expect(mac).not.toHaveAttribute("aria-label", /.*/);
+    });
+
+    test("reducing motion mid-visit removes the button semantics", async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await page.waitForSelector(READY, { timeout: 10_000 });
+      await expect(page.locator(GESTURE)).toHaveAttribute("role", "button");
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect(page.locator(READY)).toHaveCount(0);
+      const mac = page.locator(GESTURE);
+      await expect(mac).not.toHaveAttribute("role", /.*/);
+      await expect(mac).not.toHaveAttribute("tabindex", /.*/);
+      await expect(mac).not.toHaveAttribute("aria-label", /.*/);
+    });
+
     test("with reduced motion there is no gesture", async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(path);
@@ -779,6 +857,20 @@ for (const { path, locale } of homePages) {
         "data-mac-gesture",
         /.+/,
       );
+    });
+  });
+
+  test.describe(`${path}: JavaScript blocked`, () => {
+    test.use({ javaScriptEnabled: false });
+
+    test("Mac stays decorative: no role, focus stop or label", async ({
+      page,
+    }) => {
+      await page.goto(path);
+      const mac = page.locator(".hero__mac");
+      await expect(mac).not.toHaveAttribute("role", /.*/);
+      await expect(mac).not.toHaveAttribute("tabindex", /.*/);
+      await expect(mac).not.toHaveAttribute("aria-label", /.*/);
     });
   });
 

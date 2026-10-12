@@ -158,3 +158,11 @@ Aprobaciones: `sharp` 0.35.5 (raíz) se instala en T3 y `gsap` 3.15.0 y `lenis` 
     - `pnpm test` y `pnpm quality` terminan con código 0 (4 categorías ≥ 0,9, LCP ≤ 2,5 s, CLS ≤ 0,1, TBT ≤ 200 ms) y los presupuestos de la sección 8 del plan se cumplen (valores anotados).
     - Documentación al día y propuesta de mover a `AGENTS.md` lo que sea regla permanente.
     - **Parada: sin push.** El usuario hace el push, revisa el staging desde el móvil con y sin movimiento reducido, aprueba por escrito los textos (spec), el aspecto de los recortes y los colores, y entonces se cierra la spec con VEREDICTO: APROBADO.
+
+## Cambio posterior al cierre (2026-10-12)
+
+- [x] **T24. Gesto de Mac con teclado: primero tests en `motion.spec.ts` y `a11y.spec.ts` (Mac recibe foco con Tab solo con la capa activa; Intro y Espacio disparan el gesto de 0,6 s; foco visible; sin la capa o con movimiento reducido no hay foco ni rol; axe sin infracciones antes y después); después `home-motion.ts` (al activarse la capa, Mac pasa a `role="button"`, `tabindex="0"` y nombre accesible traducido desde `translations.ts` pasado por un atributo de datos del HTML; el cleanup lo retira).** RF-36
+  - Hecho cuando:
+    - Los tests pasaron de rojo a verde en ES y EN y `pnpm test`, `pnpm lint` y `pnpm format:check` están en verde.
+    - Sin JavaScript, con scripts bloqueados y con movimiento reducido, Mac sigue sin foco y sin rol (decorativa).
+    - El nombre accesible está en ES y EN en `translations.ts` y en la tabla de textos de la spec (clave nueva; el test de traducciones compara ambos).

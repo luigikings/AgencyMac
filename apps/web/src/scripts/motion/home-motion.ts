@@ -196,7 +196,8 @@ function travelingMac(): () => void {
 // Mac's gesture (RF-36): a click or tap on Mac in the hero plays a short
 // wiggle of GESTURE_MS. `data-mac-gesture="playing"` is set when it starts and
 // removed when it ends. Only `transform` moves; no text is touched. Mouse and
-// touch only: Mac is a decoration, not a control, so it takes no focus.
+// touch and keyboard (Enter or Space): Mac only becomes a button while this
+// layer is active; without it Mac stays a decorative image with no focus.
 function macGesture(): () => void {
   const mac = document.querySelector<HTMLElement>(".hero__mac");
   if (!mac) return () => {};
@@ -231,10 +232,27 @@ function macGesture(): () => void {
       });
   };
 
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault(); // Space must not scroll the page.
+    play();
+  };
+
+  // While the layer is active Mac is a button (RF-36): reachable with Tab,
+  // named from the text the HTML serves in a data attribute (ES or EN).
+  const label = mac.closest<HTMLElement>("[data-mac-label]")?.dataset.macLabel;
+  mac.setAttribute("role", "button");
+  mac.setAttribute("tabindex", "0");
+  if (label) mac.setAttribute("aria-label", label);
   mac.addEventListener("click", play);
+  mac.addEventListener("keydown", onKey);
   mac.style.cursor = "pointer";
   return () => {
     mac.removeEventListener("click", play);
+    mac.removeEventListener("keydown", onKey);
+    mac.removeAttribute("role");
+    mac.removeAttribute("tabindex");
+    mac.removeAttribute("aria-label");
     mac.style.removeProperty("cursor");
     playing?.kill();
     playing = undefined;

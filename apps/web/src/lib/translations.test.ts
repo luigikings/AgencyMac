@@ -39,6 +39,7 @@ const HOME_KEYS = [
   "hero.subtitle",
   "hero.discover",
   "hero.macAlt",
+  "hero.macGestureLabel",
   "services.heading",
   "services.intro",
   "services.tagBase",

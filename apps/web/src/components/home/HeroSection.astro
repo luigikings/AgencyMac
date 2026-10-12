@@ -25,7 +25,7 @@ const { locale } = Astro.props;
         {t(locale, "hero.discover")}
       </a>
     </div>
-    <div class="hero__art">
+    <div class="hero__art" data-mac-label={t(locale, "hero.macGestureLabel")}>
       <div class="hero__halo" aria-hidden="true"></div>
       <BrandPicture
         src={moon}
@@ -140,6 +140,12 @@ const { locale } = Astro.props;
     bottom: 0;
     left: 0;
     width: 68%;
+  }
+
+  /* Mac is only focusable while the animation layer makes it a button. */
+  .hero__art :global(.hero__mac:focus-visible) {
+    outline: 3px solid var(--color-button-hover);
+    outline-offset: 4px;
   }
 
   @media (min-width: 48rem) {

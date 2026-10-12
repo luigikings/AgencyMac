@@ -151,6 +151,10 @@ test.describe("Accessibility with the animation active", () => {
           timeout: 10_000,
         });
         if (stage === "after") {
+          await expect(page.locator(".hero__mac")).toHaveAttribute(
+            "role",
+            "button",
+          );
           await revealAll(page);
           // Every half of every block is fully opaque again.
           await expect
@@ -167,6 +171,11 @@ test.describe("Accessibility with the animation active", () => {
         } else {
           // The traveller is part of the page now: it must not break axe.
           await expect(page.locator("img[data-traveler]")).toHaveCount(1);
+          // Mac is a labelled button now (RF-36): axe must accept it too.
+          await expect(page.locator(".hero__mac")).toHaveAttribute(
+            "role",
+            "button",
+          );
         }
         const results = await new AxeBuilder({ page }).analyze();
         expect(results.violations).toEqual([]);

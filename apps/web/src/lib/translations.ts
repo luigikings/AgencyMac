@@ -35,6 +35,7 @@ const es = {
   "hero.subtitle":
     "Webs rápidas, posicionamiento en Google y anuncios que funcionan, de la mano de un equipo de marketing, análisis y desarrollo.",
   "hero.discover": "Descubre cómo",
+  "hero.macGestureLabel": "Saludar a Mac",
   "hero.macAlt": "Mac, el alien mascota de AgencyMac, asomado a su nave",
   "services.heading": "Tres planetas para despegar",
   "services.intro":
@@ -106,6 +107,7 @@ const en: Record<TranslationKey, string> = {
   "hero.subtitle":
     "Fast websites, Google rankings and ads that work, from a team of marketing, analytics and development specialists.",
   "hero.discover": "Find out how",
+  "hero.macGestureLabel": "Say hi to Mac",
   "hero.macAlt":
     "Mac, the AgencyMac alien mascot, peeking out of his spaceship",
   "services.heading": "Three planets to take off",
