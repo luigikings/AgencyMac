@@ -21,6 +21,10 @@ const { locale, href = CTA_TARGET } = Astro.props;
 <style>
   /* Colours come only from the brand tokens (src/styles/tokens.ts). */
   .cta {
+    position: relative;
+    /* The shine lives behind the label (z-index -1 inside this context). */
+    isolation: isolate;
+    overflow: hidden;
     display: inline-block;
     box-sizing: border-box;
     padding: 0.6rem 1.25rem;
@@ -37,5 +41,60 @@ const { locale, href = CTA_TARGET } = Astro.props;
   .cta:hover,
   .cta:focus-visible {
     background: var(--color-button-hover);
+  }
+
+  /* Shine, parked to the left until the button is hovered or focused. */
+  .cta::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    transform: translateX(-120%);
+  }
+
+  /* RF-20: lift 2 px, glow and a 0.6 s sweep; press shrinks to 0.97. With
+     reduced motion none of this exists: only the colour above changes. */
+  @media (prefers-reduced-motion: no-preference) {
+    .cta {
+      transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        background-color 0.2s ease;
+    }
+
+    .cta:hover,
+    .cta:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 0 18px
+        color-mix(in srgb, var(--color-button-hover) 60%, transparent);
+    }
+
+    /* The gradient only exists while it sweeps: at rest the button is a flat
+       colour, so the accessibility check can compute its contrast. */
+    .cta:hover::before,
+    .cta:focus-visible::before {
+      background: linear-gradient(
+        100deg,
+        transparent 30%,
+        color-mix(in srgb, var(--color-text) 45%, transparent) 50%,
+        transparent 70%
+      );
+      animation: cta-sweep 0.6s ease-out;
+    }
+
+    .cta:active {
+      transform: translateY(-2px) scale(0.97);
+    }
+
+    @keyframes cta-sweep {
+      from {
+        transform: translateX(-120%);
+      }
+
+      to {
+        transform: translateX(120%);
+      }
+    }
   }
 </style>

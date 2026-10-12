@@ -13,8 +13,12 @@ const { locale } = Astro.props;
 
 <section id="team" class="team" aria-labelledby="team-heading">
   <div class="team__inner">
-    <h2 id="team-heading">{t(locale, "team.heading")}</h2>
-    <p class="team__intro">{t(locale, "team.intro")}</p>
+    <h2 id="team-heading" data-sky-text>
+      {t(locale, "team.heading")}
+    </h2>
+    <p class="team__intro" data-sky-text>
+      {t(locale, "team.intro")}
+    </p>
     <ul class="team__list">
       {TEAM.map((person) => (
         <li class="member">

@@ -1,5 +1,6 @@
 ---
 import type { Locale } from "../lib/i18n";
+import { macLinesJson } from "../lib/mac-lines";
 import ContactSection from "./home/ContactSection.astro";
 import HeroSection from "./home/HeroSection.astro";
 import ProjectsSection from "./home/ProjectsSection.astro";
@@ -19,6 +20,13 @@ const { locale } = Astro.props;
 <TeamSection locale={locale} />
 <ContactSection locale={locale} />
 
+<!-- Mac's lines (spec 005): data, not code; read by the effects layer when needed. -->
+<script
+  type="application/json"
+  id="mac-lines"
+  is:inline
+  set:html={macLinesJson(locale)}
+/>
 <!-- Deferred animation layer (spec 004): the content above needs none of it. -->
 <script>
   import "../scripts/motion-entry";

@@ -40,6 +40,21 @@ const EXPECTED = [
   ],
   ["planetRankiaBg", "#1F2A7A", /rankia.*block/i, "--color-planet-rankia-bg"],
   ["planetAdaraBg", "#7A1A12", /adara.*block/i, "--color-planet-adara-bg"],
+  // Spec 005 (plan section 7): glow colours of the sky ambients.
+  [
+    "planetHexawebGlow",
+    "#1FB5C0",
+    /hexaweb.*glow/i,
+    "--color-planet-hexaweb-glow",
+  ],
+  [
+    "planetRankiaGlow",
+    "#5B6CFF",
+    /rankia.*glow/i,
+    "--color-planet-rankia-glow",
+  ],
+  ["planetAdaraGlow", "#FF7A45", /adara.*glow/i, "--color-planet-adara-glow"],
+  ["earthGlow", "#2E8BFF", /projects.*glow/i, "--color-earth-glow"],
 ] as const;
 
 describe("colors (RF-16)", () => {

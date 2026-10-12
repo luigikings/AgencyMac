@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { colors } from "../styles/tokens";
+import { TIER_PARAMS } from "./fx/fx-config";
+import { AMBIENTS } from "./sky/ambients";
 import { LOCALES } from "./i18n";
 import {
+  AMBIENT_ZONES,
   CTA_TARGET,
   DISCOVER_TARGET,
   NAV_SECTIONS,
@@ -120,5 +123,39 @@ describe("TEAM", () => {
       expect(Object.keys(person).sort()).toEqual(["name", "roleKey"]);
       expect(keyExists(person.roleKey), person.roleKey).toBe(true);
     }
+  });
+});
+
+// Spec 005: ambient zones and moons per planet.
+describe("AMBIENT_ZONES (RF-5)", () => {
+  it("lists the 7 zones in page order, matching the ambients", () => {
+    expect(AMBIENT_ZONES.map((zone) => zone.id)).toEqual(
+      AMBIENTS.map((ambient) => ambient.id),
+    );
+    expect(AMBIENT_ZONES).toHaveLength(7);
+  });
+
+  it("points each zone at its block of the page", () => {
+    expect(AMBIENT_ZONES.map((zone) => zone.selector)).toEqual([
+      "#hero",
+      '[data-planet="hexaweb"]',
+      '[data-planet="rankia"]',
+      '[data-planet="adara"]',
+      "#projects",
+      "#team",
+      "#contact",
+    ]);
+  });
+});
+
+describe("moons of the planets (RF-12)", () => {
+  it("has 1, 2 and 1 moons for Hexaweb, Rankia and Adara", () => {
+    expect(SERVICES.map((service) => service.moons)).toEqual([1, 2, 1]);
+  });
+
+  it("agrees with the animated moons of the mid and high tiers", () => {
+    expect(SERVICES.map((service) => service.moons)).toEqual([
+      ...TIER_PARAMS.mid.moonsPerPlanet,
+    ]);
   });
 });

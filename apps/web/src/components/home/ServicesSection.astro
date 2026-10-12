@@ -28,8 +28,10 @@ const imageOf = (name: string) => {
 
 <section id="services" class="services" aria-labelledby="services-heading">
   <div class="services__intro">
-    <h2 id="services-heading">{t(locale, "services.heading")}</h2>
-    <p>{t(locale, "services.intro")}</p>
+    <h2 id="services-heading" data-sky-text>
+      {t(locale, "services.heading")}
+    </h2>
+    <p data-sky-text>{t(locale, "services.intro")}</p>
   </div>
   {SERVICES.map((service, index) => (
     <article
@@ -50,9 +52,13 @@ const imageOf = (name: string) => {
         </div>
         <div class="service__text">
           <p class="service__tag">{t(locale, service.tagKey)}</p>
-          <h3>{service.name}</h3>
-          <p class="service__role">{t(locale, service.roleKey)}</p>
-          <p class="service__body">{t(locale, service.bodyKey)}</p>
+          <h3 data-sky-text>{service.name}</h3>
+          <p class="service__role" data-sky-text>
+            {t(locale, service.roleKey)}
+          </p>
+          <p class="service__body" data-sky-text>
+            {t(locale, service.bodyKey)}
+          </p>
         </div>
       </div>
     </article>

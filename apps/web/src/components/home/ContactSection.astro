@@ -13,8 +13,12 @@ const { locale } = Astro.props;
 
 <section id="contact" class="contact" aria-labelledby="contact-heading">
   <div class="contact__inner">
-    <h2 id="contact-heading">{t(locale, "contact.heading")}</h2>
-    <p class="contact__body">{t(locale, "contact.body")}</p>
+    <h2 id="contact-heading" data-sky-text>
+      {t(locale, "contact.heading")}
+    </h2>
+    <p class="contact__body" data-sky-text>
+      {t(locale, "contact.body")}
+    </p>
     <p class="contact__status">{t(locale, "contact.status")}</p>
     <CtaButton locale={locale} />
   </div>

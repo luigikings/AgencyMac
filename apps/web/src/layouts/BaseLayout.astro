@@ -1,10 +1,12 @@
 ---
 import { Font } from "astro:assets";
 import SiteFooter from "../components/SiteFooter.astro";
+import SkyBackdrop from "../components/SkyBackdrop.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import type { Locale } from "../lib/i18n";
 import { SITE_NAME, buildPageTitle } from "../lib/site";
 import { alternateLinks, canonicalUrl, type SocialMetaTag } from "../lib/seo";
+import { skyStarsCss } from "../lib/sky/sky-css";
 import { colors, fontPreloads, fonts, tokensToCss } from "../styles/tokens";
 
 interface Props {
@@ -23,6 +25,8 @@ interface Props {
    * main of the 404s.
    */
   fullWidth?: boolean;
+  /** Fixed sky of stars behind the content (home pages only; spec 005). */
+  sky?: boolean;
   /** Open Graph and Twitter tags (home pages only). */
   social?: SocialMetaTag[];
   /** Serialized JSON-LD for a `application/ld+json` block (home pages only). */
@@ -36,6 +40,7 @@ const {
   seo,
   showLanguageSwitch = true,
   fullWidth = false,
+  sky = false,
   social = [],
   jsonLd,
 } = Astro.props;
@@ -82,8 +87,10 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
       preload={fontPreloads(fonts.body)}
     />
     <style is:inline set:html={tokensToCss(colors)} />
+    {sky && <style is:inline id="sky-stars" set:html={skyStarsCss()} />}
   </head>
-  <body>
+  <body data-sky={sky ? "" : undefined}>
+    {sky && <SkyBackdrop />}
     <SiteHeader locale={locale} showLanguageSwitch={showLanguageSwitch} />
     <main id="content" class:list={{ "main--full": fullWidth }}>
       <slot />

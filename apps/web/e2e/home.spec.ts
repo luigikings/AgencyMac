@@ -206,6 +206,9 @@ test.describe("Hero", () => {
         .evaluateAll((elements) =>
           elements
             .filter((element) => {
+              // The flame of Mac is a decoration that fades in and out in the
+              // entrance (spec 005, RF-18); nothing with content may hide.
+              if (element.matches(".hero__flame")) return false;
               const style = getComputedStyle(element);
               return style.opacity === "0" || style.visibility === "hidden";
             })

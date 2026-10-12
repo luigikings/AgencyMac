@@ -3,8 +3,11 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  OPACITY_ZERO_KEYFRAMES,
   extractStyleBlocks,
+  findBlurInKeyframes,
   findHidingRules,
+  findUnguardedKeyframes,
   findUnguardedMotion,
 } from "./motion-css";
 
@@ -111,5 +114,103 @@ describe("the website styles", () => {
     expect(block![0]).toMatch(/transition:\s*none\s*!important/);
     expect(block![0]).toMatch(/animation:\s*none\s*!important/);
     expect(block![0]).toMatch(/scroll-behavior:\s*auto\s*!important/);
+  });
+});
+
+// Spec 005 (T8): the sky adds @keyframes. Opacity 0 is only allowed inside
+// the keyframes of pure decorations; blur never animates; every @keyframes
+// lives under `no-preference`.
+describe("findHidingRules with keyframes (spec 005)", () => {
+  it.each(OPACITY_ZERO_KEYFRAMES)(
+    "allows opacity 0 in @keyframes %s",
+    (name) => {
+      const css = `@keyframes ${name} { from { opacity: 0; } to { opacity: 1; } }`;
+      expect(findHidingRules(css)).toEqual([]);
+    },
+  );
+
+  it("lists the allowed decorations of the plan", () => {
+    expect([...OPACITY_ZERO_KEYFRAMES]).toEqual([
+      "hero-halo",
+      "hero-aura",
+      "hero-sparkle",
+      "hero-flame",
+      "orbit-ring",
+      "planet-halo-pulse",
+    ]);
+  });
+
+  it("flags opacity 0 in any other @keyframes", () => {
+    const css = `@keyframes text-in { from { opacity: 0; } to { opacity: 1; } }`;
+    expect(findHidingRules(css).length).toBeGreaterThan(0);
+  });
+
+  it("still flags opacity 0 on a plain rule next to an allowed keyframes", () => {
+    const css = `@keyframes hero-halo { from { opacity: 0; } }
+      .a { opacity: 0; }`;
+    expect(findHidingRules(css)).toEqual(["opacity: 0"]);
+  });
+
+  it("allows opacity 0 inside an allowed keyframes under a media query", () => {
+    const css = `@media (prefers-reduced-motion: no-preference) {
+      @keyframes hero-flame { 0% { opacity: 0; } 100% { opacity: 0; } }
+    }`;
+    expect(findHidingRules(css)).toEqual([]);
+  });
+
+  it("does not let the allowance leak past the end of the keyframes", () => {
+    const css = `@keyframes hero-halo { from { opacity: 0; } }
+      @keyframes other { from { opacity: 0; } }`;
+    expect(findHidingRules(css)).toEqual(["opacity: 0"]);
+  });
+});
+
+describe("findBlurInKeyframes (spec 005)", () => {
+  it.each([
+    "@keyframes a { from { filter: blur(0); } to { filter: blur(8px); } }",
+    "@keyframes a { 50% { filter: blur(2px) brightness(1.2); } }",
+    "@keyframes a { 50% { backdrop-filter: blur(4px); } }",
+  ])("flags %j", (css) => {
+    expect(findBlurInKeyframes(css).length).toBeGreaterThan(0);
+  });
+
+  it("allows other filters and a static blur outside keyframes", () => {
+    expect(
+      findBlurInKeyframes(
+        "@keyframes a { to { filter: brightness(1.2); } } .b { filter: blur(2px); }",
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("findUnguardedKeyframes (spec 005)", () => {
+  it("flags @keyframes outside a no-preference query", () => {
+    expect(
+      findUnguardedKeyframes("@keyframes spin { to { transform: none; } }"),
+    ).toEqual(["spin"]);
+  });
+
+  it("allows @keyframes inside (prefers-reduced-motion: no-preference)", () => {
+    const css = `@media (prefers-reduced-motion: no-preference) {
+      @keyframes spin { to { transform: none; } }
+    }`;
+    expect(findUnguardedKeyframes(css)).toEqual([]);
+  });
+
+  it("flags the ones that come after the query closes", () => {
+    const css = `@media (prefers-reduced-motion: no-preference) { @keyframes a { to { opacity: 1; } } }
+      @keyframes b { to { opacity: 1; } }`;
+    expect(findUnguardedKeyframes(css)).toEqual(["b"]);
+  });
+});
+
+describe("the website styles and the keyframes (spec 005)", () => {
+  const sources = styleSources();
+
+  it("no @keyframes blurs and every one is under no-preference", () => {
+    for (const { file, css } of sources) {
+      expect(findBlurInKeyframes(css), file).toEqual([]);
+      expect(findUnguardedKeyframes(css), file).toEqual([]);
+    }
   });
 });

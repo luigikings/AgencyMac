@@ -16,8 +16,10 @@ const { locale } = Astro.props;
 <section id="projects" class="projects" aria-labelledby="projects-heading">
   <div class="projects__inner">
     <div class="projects__intro">
-      <h2 id="projects-heading">{t(locale, "projects.heading")}</h2>
-      <p>{t(locale, "projects.intro")}</p>
+      <h2 id="projects-heading" data-sky-text>
+        {t(locale, "projects.heading")}
+      </h2>
+      <p data-sky-text>{t(locale, "projects.intro")}</p>
       <BrandPicture
         src={earth}
         alt=""

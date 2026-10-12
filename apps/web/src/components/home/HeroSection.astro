@@ -17,16 +17,25 @@ const { locale } = Astro.props;
 <section id="hero" class="hero" aria-labelledby="hero-heading">
   <div class="hero__inner">
     <div class="hero__text">
-      <p class="hero__kicker">{t(locale, "hero.kicker")}</p>
-      <h1 id="hero-heading">{t(locale, "hero.heading")}</h1>
-      <p class="hero__tagline">{t(locale, "hero.tagline")}</p>
-      <p class="hero__subtitle">{t(locale, "hero.subtitle")}</p>
+      <p class="hero__kicker" data-sky-text>
+        {t(locale, "hero.kicker")}
+      </p>
+      <h1 id="hero-heading" data-sky-text>
+        {t(locale, "hero.heading")}
+      </h1>
+      <p class="hero__tagline" data-sky-text>
+        {t(locale, "hero.tagline")}
+      </p>
+      <p class="hero__subtitle" data-sky-text>
+        {t(locale, "hero.subtitle")}
+      </p>
       <a class="hero__discover" href={DISCOVER_TARGET}>
         {t(locale, "hero.discover")}
       </a>
     </div>
     <div class="hero__art" data-mac-label={t(locale, "hero.macGestureLabel")}>
       <div class="hero__halo" aria-hidden="true"></div>
+      <div class="hero__aura" aria-hidden="true"></div>
       <BrandPicture
         src={moon}
         alt=""
@@ -36,15 +45,29 @@ const { locale } = Astro.props;
         highPriority
         class="hero__moon"
       />
-      <BrandPicture
-        src={mac}
-        alt={t(locale, "hero.macAlt")}
-        widths={[240, 360, 540]}
-        sizes="(min-width: 48rem) 20rem, 64vw"
-        priority
-        highPriority
-        class="hero__mac"
-      />
+      <div class="hero__orbit" aria-hidden="true">
+        <span class="hero__orbit-body"></span>
+      </div>
+      <div class="hero__sparkles" aria-hidden="true">
+        <span class="hero__sparkle"></span>
+        <span class="hero__sparkle"></span>
+        <span class="hero__sparkle"></span>
+        <span class="hero__sparkle"></span>
+      </div>
+      {/* Two layers (plan D17): the wrapper carries the CSS entrance, the image
+          stays free for the gesture and the gaze of the animation layer. */}
+      <div class="hero__mac-wrap">
+        <div class="hero__flame" aria-hidden="true"></div>
+        <BrandPicture
+          src={mac}
+          alt={t(locale, "hero.macAlt")}
+          widths={[240, 360, 540]}
+          sizes="(min-width: 48rem) 20rem, 64vw"
+          priority
+          highPriority
+          class="hero__mac"
+        />
+      </div>
     </div>
   </div>
 </section>
@@ -124,22 +147,322 @@ const { locale } = Astro.props;
     );
   }
 
-  .hero__art :global(.hero__moon),
-  .hero__art :global(.hero__mac) {
+  .hero__art :global(.hero__moon) {
     position: absolute;
     height: auto;
-  }
-
-  .hero__art :global(.hero__moon) {
     top: 0;
     right: 0;
     width: 78%;
   }
 
-  .hero__art :global(.hero__mac) {
+  .hero__mac-wrap {
+    position: absolute;
     bottom: 0;
     left: 0;
     width: 68%;
+  }
+
+  .hero__art :global(.hero__mac) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Decoration (spec 005, RF-19): none of it covers text, takes focus or
+     moves the layout; it is all absolute inside the art. Still and complete
+     without animation. */
+  /* The aura is the shadow of a circle the size of the moon, behind it: a
+     shadow adds nothing to the scrollable area, so it cannot overflow. */
+  .hero__aura {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 78%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow:
+      0 0 2.5rem 0.5rem
+        color-mix(in srgb, var(--color-logo-gradient-1) 38%, transparent),
+      0 0 6rem 1.5rem
+        color-mix(in srgb, var(--color-logo-gradient-2) 22%, transparent);
+  }
+
+  .hero__orbit {
+    position: absolute;
+    /* The body rides a circle just inside the ring: it never leaves this box. */
+    inset: 1%;
+    border: 1px dashed
+      color-mix(in srgb, var(--color-accent-green) 35%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  /* The body rides a circle (offset-path): the square of the orbit never
+     turns, so nothing sticks out of the art. Without support for offset-path
+     it simply stays at the start of the ring. */
+  .hero__orbit-body {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6.4%;
+    offset-path: circle(46.8% at 50% 50%);
+    offset-rotate: 0deg;
+    offset-distance: 0%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 35% 35%,
+      var(--color-text),
+      var(--color-accent-green) 55%,
+      var(--color-button-hover)
+    );
+  }
+
+  .hero__sparkles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .hero__sparkle {
+    position: absolute;
+    width: 0.7rem;
+    height: 0.7rem;
+    background: var(--color-button-hover);
+    clip-path: polygon(
+      50% 0,
+      62% 38%,
+      100% 50%,
+      62% 62%,
+      50% 100%,
+      38% 62%,
+      0 50%,
+      38% 38%
+    );
+    opacity: 0.8;
+  }
+
+  .hero__sparkle:nth-child(1) {
+    left: 4%;
+    top: 34%;
+  }
+
+  .hero__sparkle:nth-child(2) {
+    left: 46%;
+    top: 4%;
+  }
+
+  .hero__sparkle:nth-child(3) {
+    left: 90%;
+    top: 52%;
+  }
+
+  .hero__sparkle:nth-child(4) {
+    left: 58%;
+    top: 90%;
+  }
+
+  /* The thruster under the saucer. Off by default (scaled to nothing, no
+     rule hides it); it only burns during the entrance flight, below. */
+  .hero__flame {
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    top: 74%;
+    height: 38%;
+    background: radial-gradient(
+      ellipse at 50% 0,
+      color-mix(in srgb, var(--color-button-hover) 95%, transparent) 0%,
+      color-mix(in srgb, var(--color-logo-gradient-2) 80%, transparent) 40%,
+      transparent 75%
+    );
+    transform: scale(0);
+    transform-origin: 50% 0;
+    pointer-events: none;
+  }
+
+  /* Entrance of the hero (spec 005, RF-16 to RF-18): plain CSS, from the first
+     paint, no script. Everything starts inside the window and fully opaque:
+     it only moves and scales. Only the flame (a decoration) fades. */
+  @media (prefers-reduced-motion: no-preference) {
+    .hero__kicker {
+      animation: hero-text-in 0.35s ease-out both;
+    }
+
+    .hero h1 {
+      animation: hero-text-in 0.35s ease-out 0.03s both;
+    }
+
+    .hero__tagline {
+      animation: hero-text-in 0.35s ease-out 0.06s both;
+    }
+
+    .hero__subtitle {
+      animation: hero-text-in 0.35s ease-out 0.09s both;
+    }
+
+    .hero__discover {
+      animation: hero-text-in 0.35s ease-out 0.12s both;
+    }
+
+    .hero__art :global(.hero__moon) {
+      animation: hero-moon-rise 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    /* Flight 0.2 to 1.2 s, then a 0.4 s bounce on the moon (ends at 1.6 s). */
+    .hero__mac-wrap {
+      animation:
+        hero-mac-land 1s cubic-bezier(0.3, 0.7, 0.3, 1) 0.2s both,
+        hero-mac-bounce 0.4s ease-out 1.2s forwards;
+    }
+
+    .hero__flame {
+      animation: hero-flame 1.05s ease-out 0.2s both;
+    }
+
+    /* Always-on decoration: compositor only (transform, opacity), one cycle
+       per blink, never faster than 3 blinks a second (RNF-10). */
+    .hero__aura {
+      animation: hero-aura 5s ease-in-out infinite alternate;
+    }
+
+    .hero__orbit {
+      animation: orbit-ring 1.2s ease-out both;
+    }
+
+    .hero__orbit-body {
+      animation: hero-orbit-spin 22s linear infinite;
+    }
+
+    .hero__sparkle:nth-child(1) {
+      animation: hero-sparkle 2.2s ease-in-out infinite;
+    }
+
+    .hero__sparkle:nth-child(2) {
+      animation: hero-sparkle 2.9s ease-in-out 0.6s infinite;
+    }
+
+    .hero__sparkle:nth-child(3) {
+      animation: hero-sparkle 3.4s ease-in-out 1.1s infinite;
+    }
+
+    .hero__sparkle:nth-child(4) {
+      animation: hero-sparkle 2.6s ease-in-out 1.7s infinite;
+    }
+
+    @keyframes hero-aura {
+      from {
+        opacity: 0.55;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes orbit-ring {
+      from {
+        opacity: 0.1;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes hero-orbit-spin {
+      to {
+        offset-distance: 100%;
+      }
+    }
+
+    @keyframes hero-sparkle {
+      0%,
+      100% {
+        opacity: 0.15;
+        transform: scale(0.6);
+      }
+
+      50% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes hero-text-in {
+      from {
+        transform: translateY(14px);
+      }
+
+      to {
+        transform: none;
+      }
+    }
+
+    @keyframes hero-moon-rise {
+      from {
+        transform: translateY(14%) scale(0.88);
+      }
+
+      to {
+        transform: none;
+      }
+    }
+
+    @keyframes hero-mac-land {
+      0% {
+        transform: translate(-4%, 24%) scale(0.7) rotate(-12deg);
+      }
+
+      60% {
+        transform: translate(2%, -4%) scale(1.04) rotate(3deg);
+      }
+
+      100% {
+        transform: none;
+      }
+    }
+
+    @keyframes hero-mac-bounce {
+      0% {
+        transform: none;
+      }
+
+      35% {
+        transform: translateY(-5%) scale(1.02, 0.98);
+      }
+
+      70% {
+        transform: translateY(1.5%) scale(0.99, 1.01);
+      }
+
+      100% {
+        transform: none;
+      }
+    }
+
+    @keyframes hero-flame {
+      0% {
+        opacity: 0;
+        transform: scaleY(0.3);
+      }
+
+      12% {
+        opacity: 0.95;
+        transform: scaleY(1);
+      }
+
+      80% {
+        opacity: 0.95;
+        transform: scaleY(1.15);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scaleY(0.3);
+      }
+    }
   }
 
   /* Mac is only focusable while the animation layer makes it a button. */

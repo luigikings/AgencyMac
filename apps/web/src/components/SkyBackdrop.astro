@@ -1,0 +1,49 @@
+---
+import { STAR_LAYERS } from "../lib/sky/star-field";
+
+// Fixed sky of the home page (spec 005, RF-1, RF-9, RF-42): three layers of
+// stars. The lists of stars are generated at build time (lib/sky/sky-css.ts)
+// and BaseLayout puts them in the head; here only the structure and the
+// stacking rules live. Decorative: hidden from screen readers and click-through.
+---
+
+<div class="sky" aria-hidden="true">
+  {STAR_LAYERS.map((layer) => (
+    <div
+      class={`sky__layer sky__layer--${layer.id}`}
+      data-star-layer={layer.id}
+      data-star-count={layer.desktopCount}
+      data-star-count-narrow={layer.mobileCount}
+    />
+  ))}
+</div>
+
+<style is:global>
+  /* Under the content, over the solid colour of every section: the sections'
+     backgrounds are not positioned, so a fixed layer paints over them, and the
+     content of each section is lifted above it. main and the sections must
+     never get z-index, transform, filter or contain: paint, or their
+     backgrounds would stack over the sky. */
+  .sky {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  body[data-sky]
+    :is(
+      .site-header,
+      .site-footer,
+      .hero__inner,
+      .services__intro,
+      .service__inner,
+      .projects__inner,
+      .team__inner,
+      .contact__inner
+    ) {
+    position: relative;
+    z-index: 1;
+  }
+</style>

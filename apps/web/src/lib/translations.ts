@@ -73,6 +73,18 @@ const es = {
   "contact.body":
     "Estamos terminando el formulario para pedir presupuesto. Muy pronto podrás contarnos tu proyecto desde aquí y despegar con nosotros.",
   "contact.status": "Formulario próximamente",
+  // Spec 005: Mac's lines and the footer phrase (table "Textos propuestos").
+  "mac.greet": "¡Hola, terrícola!",
+  "mac.arrive.hexaweb": "Hexaweb: aquí se construyen webs que despegan.",
+  "mac.arrive.rankia": "Rankia: que Google te encuentre a la primera.",
+  "mac.arrive.adara": "Adara: ¡propulsor a tope!",
+  "mac.arrive.contact": "¡Todo listo para despegar!",
+  "mac.click.1": "¡Eh, cosquillas!",
+  "mac.click.2": "Beep boop. Te veo.",
+  "mac.click.3": "Despegando... casi.",
+  "mac.idle": "¿Seguimos el viaje?",
+  "mac.turbo": "¡Modo turbo activado!",
+  "footer.detail": "Hecho en la Tierra, con cariño galáctico.",
 } as const satisfies Record<string, string>;
 
 /** Every translation key. Spanish is the reference dictionary. */
@@ -146,6 +158,18 @@ const en: Record<TranslationKey, string> = {
   "contact.body":
     "We are finishing the quote request form. Very soon you will be able to tell us about your project right here and take off with us.",
   "contact.status": "Form coming soon",
+  "mac.greet": "Hello, earthling!",
+  "mac.arrive.hexaweb":
+    "Hexaweb: this is where websites that take off are built.",
+  "mac.arrive.rankia": "Rankia: so Google finds you first time.",
+  "mac.arrive.adara": "Adara: booster at full power!",
+  "mac.arrive.contact": "Everything is ready for take-off!",
+  "mac.click.1": "Hey, that tickles!",
+  "mac.click.2": "Beep boop. I see you.",
+  "mac.click.3": "Lift-off... almost.",
+  "mac.idle": "Shall we carry on with the trip?",
+  "mac.turbo": "Turbo mode on!",
+  "footer.detail": "Made on Earth, with galactic love.",
 };
 
 export const translations: Record<

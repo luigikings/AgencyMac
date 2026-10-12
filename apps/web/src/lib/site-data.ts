@@ -3,6 +3,7 @@
 // translatable text is referenced by its key in translations.ts.
 
 import type { ColorName } from "../styles/tokens";
+import type { AmbientId } from "./sky/ambients";
 import type { TranslationKey } from "./translations";
 
 export type Section = {
@@ -44,6 +45,8 @@ export type Service = {
   bgToken: ColorName;
   /** Name of the planet image in src/assets/brand/. */
   image: `planet-${string}`;
+  /** Animated moons orbiting the planet (spec 005, RF-12). */
+  moons: number;
 };
 
 /** The three services, as planets: base plan first, booster last. */
@@ -57,6 +60,7 @@ export const SERVICES: readonly Service[] = [
     altKey: "services.hexaweb.alt",
     bgToken: "planetHexawebBg",
     image: "planet-hexaweb",
+    moons: 1,
   },
   {
     id: "rankia",
@@ -67,6 +71,7 @@ export const SERVICES: readonly Service[] = [
     altKey: "services.rankia.alt",
     bgToken: "planetRankiaBg",
     image: "planet-rankia",
+    moons: 2,
   },
   {
     id: "adara",
@@ -77,6 +82,7 @@ export const SERVICES: readonly Service[] = [
     altKey: "services.adara.alt",
     bgToken: "planetAdaraBg",
     image: "planet-adara",
+    moons: 1,
   },
 ];
 
@@ -117,4 +123,22 @@ export const TEAM: readonly TeamMember[] = [
   { name: "Joni", roleKey: "team.role.marketing" },
   { name: "Samuel", roleKey: "team.role.analytics" },
   { name: "Luigi", roleKey: "team.role.coding" },
+];
+
+export type AmbientZone = {
+  /** Ambient of the zone (table in lib/sky/ambients.ts). */
+  id: AmbientId;
+  /** CSS selector of the block of the page that holds the zone. */
+  selector: string;
+};
+
+/** The 7 zones of the sky, in page order (spec 005, RF-5). */
+export const AMBIENT_ZONES: readonly AmbientZone[] = [
+  { id: "hero", selector: "#hero" },
+  { id: "hexaweb", selector: '[data-planet="hexaweb"]' },
+  { id: "rankia", selector: '[data-planet="rankia"]' },
+  { id: "adara", selector: '[data-planet="adara"]' },
+  { id: "projects", selector: "#projects" },
+  { id: "team", selector: "#team" },
+  { id: "contact", selector: "#contact" },
 ];

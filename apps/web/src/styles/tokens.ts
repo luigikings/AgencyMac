@@ -37,6 +37,25 @@ export const colors = {
     value: "#7A1A12",
     role: "Adara service block background (dark red)",
   },
+  // Glow colours of the sky ambients (spec 005, plan section 7). Only painted
+  // as gradients with a capped alpha, never as text; proposed values, pending
+  // visual review and the luminance tests (styles/sky-luminance.test.ts).
+  planetHexawebGlow: {
+    value: "#1FB5C0",
+    role: "Hexaweb glow and halo (light teal)",
+  },
+  planetRankiaGlow: {
+    value: "#5B6CFF",
+    role: "Rankia glow and halo (light indigo)",
+  },
+  planetAdaraGlow: {
+    value: "#FF7A45",
+    role: "Adara glow and halo (orange)",
+  },
+  earthGlow: {
+    value: "#2E8BFF",
+    role: "Projects zone glow (Earth blue)",
+  },
 } as const satisfies Record<string, ColorToken>;
 
 export type ColorName = keyof typeof colors;

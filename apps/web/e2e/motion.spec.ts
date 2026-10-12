@@ -566,7 +566,15 @@ for (const { path, locale } of homePages) {
       await page.waitForTimeout(LOAD_DELAY_MS + 1000);
       const hidden = await page.evaluate(() =>
         [...document.querySelectorAll("body *")]
-          .filter((el) => !el.closest("script,style,noscript,template,source"))
+          .filter(
+            (el) =>
+              !el.closest("script,style,noscript,template,source") &&
+              // Decorations (spec 005): the sky twinkles between 0.55 and 1 (RF-3) and
+              // the flame of Mac fades in and out during the entrance (RF-18).
+              !el.closest(
+                ".sky, .hero__flame, .hero__aura, .hero__orbit, .hero__sparkle",
+              ),
+          )
           .map((el) => {
             const style = getComputedStyle(el);
             return {

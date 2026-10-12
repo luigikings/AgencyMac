@@ -81,7 +81,7 @@ test.describe("Indexable pages: minimum SEO", () => {
       test(`${path}: header, nav, main and footer`, async ({ page }) => {
         await page.goto(path);
         const landmarks = await page
-          .locator("body > *")
+          .locator("body > *:not(.sky)")
           .evaluateAll((elements) =>
             elements.map((element) => element.tagName.toLowerCase()),
           );
@@ -153,7 +153,9 @@ test.describe("All pages", () => {
           scripts.map((script) => script.getAttribute("type")),
         );
       expect(types).toEqual(
-        kind === "home" ? ["application/ld+json", "module"] : [],
+        kind === "home"
+          ? ["application/ld+json", "application/json", "module"]
+          : [],
       );
     });
   }

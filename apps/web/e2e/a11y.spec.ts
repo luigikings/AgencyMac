@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { unexpectedContrastIncomplete } from "./axe-incomplete";
 import { homePages, pages } from "./pages";
 
 // RF-20, RF-25: axe (WCAG 2.x A/AA rules, color-contrast included) finds no
@@ -17,7 +18,7 @@ test.describe("Accessibility (axe)", () => {
       // "inapplicable" or "needs review" because of an unknown background).
       const ruleIds = (list: { id: string }[]) => list.map(({ id }) => id);
       expect(ruleIds(results.passes)).toContain("color-contrast");
-      expect(ruleIds(results.incomplete)).not.toContain("color-contrast");
+      expect(unexpectedContrastIncomplete(results)).toEqual([]);
     });
   }
 });
@@ -130,7 +131,7 @@ test.describe("Accessibility after revealing the whole page", () => {
         expect(results.violations).toEqual([]);
         const ids = (list: { id: string }[]) => list.map(({ id }) => id);
         expect(ids(results.passes)).toContain("color-contrast");
-        expect(ids(results.incomplete)).not.toContain("color-contrast");
+        expect(unexpectedContrastIncomplete(results)).toEqual([]);
       });
     }
   }
@@ -181,7 +182,7 @@ test.describe("Accessibility with the animation active", () => {
         expect(results.violations).toEqual([]);
         const ids = (list: { id: string }[]) => list.map(({ id }) => id);
         expect(ids(results.passes)).toContain("color-contrast");
-        expect(ids(results.incomplete)).not.toContain("color-contrast");
+        expect(unexpectedContrastIncomplete(results)).toEqual([]);
       });
     }
   }
