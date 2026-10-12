@@ -137,6 +137,8 @@ describe("findHidingRules with keyframes (spec 005)", () => {
       "hero-flame",
       "orbit-ring",
       "planet-halo-pulse",
+      // Added in R1 (sparks of Mac's landing: pure decoration).
+      "hero-spark",
     ]);
   });
 

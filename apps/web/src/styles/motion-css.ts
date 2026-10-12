@@ -14,6 +14,8 @@ export const OPACITY_ZERO_KEYFRAMES: readonly string[] = [
   "hero-flame",
   "orbit-ring",
   "planet-halo-pulse",
+  // Sparks of Mac's landing (R1): small circles, no text.
+  "hero-spark",
 ];
 
 const KEYFRAMES_HEAD = /@keyframes\s+([\w-]+)\s*$/;

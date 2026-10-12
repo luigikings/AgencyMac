@@ -572,7 +572,7 @@ for (const { path, locale } of homePages) {
               // Decorations (spec 005): the sky twinkles between 0.55 and 1 (RF-3) and
               // the flame of Mac fades in and out during the entrance (RF-18).
               !el.closest(
-                ".sky, .hero__flame, .hero__aura, .hero__orbit, .hero__sparkle",
+                ".sky, .hero__flame, .hero__aura, .hero__orbit, .hero__sparkle, .hero__spark",
               ),
           )
           .map((el) => {

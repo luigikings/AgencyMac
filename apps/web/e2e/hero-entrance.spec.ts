@@ -265,6 +265,87 @@ test.describe("Entrance of the hero without scripts (RF-16, RF-17)", () => {
           expect(maxOffset).toBeGreaterThan(2);
         });
 
+        test("the flame comes out right under the saucer, centred, in flight (R1)", async ({
+          page,
+        }) => {
+          await page.route("**/*.js", (route) => route.abort());
+          await page.goto(path);
+          await installProbe(page);
+          for (const t of [400, 600, 800, 1000]) {
+            const geometry = await page.evaluate((ms) => {
+              const probe = (
+                window as unknown as { __probe: { seek: (t: number) => void } }
+              ).__probe;
+              probe.seek(ms);
+              const wrap = document.querySelector(".hero__mac-wrap")!;
+              const flame = document.querySelector(".hero__flame")!;
+              const m = new DOMMatrix(getComputedStyle(wrap).transform);
+              const angle = Math.atan2(m.b, m.a);
+              const scale = Math.hypot(m.a, m.b);
+              const w = wrap.getBoundingClientRect();
+              const f = flame.getBoundingClientRect();
+              const wc = [w.left + w.width / 2, w.top + w.height / 2];
+              const fc = [f.left + f.width / 2, f.top + f.height / 2];
+              const dx = fc[0]! - wc[0]!;
+              const dy = fc[1]! - wc[1]!;
+              // Components in Mac's own axes: down along his local y, sideways
+              // along his local x, in units of his current size.
+              const size = (wrap as HTMLElement).offsetHeight * scale;
+              return {
+                opacity: Number(getComputedStyle(flame).opacity),
+                down: (dx * -Math.sin(angle) + dy * Math.cos(angle)) / size,
+                side: (dx * Math.cos(angle) + dy * Math.sin(angle)) / size,
+              };
+            }, t);
+            const label = `at ${t} ms`;
+            expect(geometry.opacity, label).toBeGreaterThan(0.5);
+            // The centre of the flame sits below the centre of Mac (his
+            // saucer ends at 98 % of his height; the flame hangs from it).
+            expect(geometry.down, label).toBeGreaterThan(0.5);
+            expect(geometry.down, label).toBeLessThan(0.7);
+            // And it is centred under the saucer.
+            expect(Math.abs(geometry.side), label).toBeLessThan(0.03);
+          }
+        });
+
+        test("Mac sheds 4 to 6 sparks on landing, all gone before 2.0 s (R1)", async ({
+          page,
+        }) => {
+          await page.route("**/*.js", (route) => route.abort());
+          await page.goto(path);
+          await installProbe(page);
+          const info = await page.evaluate(() =>
+            (
+              window as unknown as {
+                __probe: {
+                  info: () => {
+                    name: string;
+                    target: string;
+                    delay: number;
+                    end: number;
+                  }[];
+                };
+              }
+            ).__probe.info(),
+          );
+          const sparks = info.filter((a) => a.name === "hero-spark");
+          expect(sparks.length).toBeGreaterThanOrEqual(4);
+          expect(sparks.length).toBeLessThanOrEqual(6);
+          const land = info.find((a) => a.name === "hero-mac-land")!;
+          for (const s of sparks) {
+            expect(s.delay).toBeGreaterThanOrEqual(land.delay + 900);
+            expect(s.end).toBeLessThanOrEqual(2000);
+          }
+          const decorative = await page.evaluate(() =>
+            [...document.querySelectorAll(".hero__spark")].every(
+              (el) =>
+                el.closest('[aria-hidden="true"]') &&
+                getComputedStyle(el).pointerEvents === "none",
+            ),
+          );
+          expect(decorative).toBe(true);
+        });
+
         test("the animation lives on the wrapper, not on Mac's image (D17)", async ({
           page,
         }) => {

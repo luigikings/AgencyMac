@@ -45,6 +45,79 @@ test.describe("Decoration of the hero (RF-19)", () => {
       expect(info.focusable).toBe(false);
     });
 
+    for (const width of [1280, 375]) {
+      test(`${path} at ${width} px: the aura hugs the visible moon, same centre and radius (R1)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        await page.waitForTimeout(2300);
+        const m = await page.evaluate(async () => {
+          const moon = document.querySelector<HTMLImageElement>(".hero__moon")!;
+          const size = 400;
+          const bitmap = await createImageBitmap(moon, {
+            resizeWidth: size,
+            resizeHeight: size,
+          });
+          const canvas = new OffscreenCanvas(size, size);
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(bitmap, 0, 0);
+          const { data } = ctx.getImageData(0, 0, size, size);
+          let x0 = size;
+          let y0 = size;
+          let x1 = -1;
+          let y1 = -1;
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              if (data[(y * size + x) * 4 + 3]! > 40) {
+                x0 = Math.min(x0, x);
+                y0 = Math.min(y0, y);
+                x1 = Math.max(x1, x);
+                y1 = Math.max(y1, y);
+              }
+            }
+          }
+          const r = moon.getBoundingClientRect();
+          const visible = {
+            cx: r.left + ((x0 + x1 + 1) / 2 / size) * r.width,
+            cy: r.top + ((y0 + y1 + 1) / 2 / size) * r.height,
+            radius:
+              (((x1 - x0 + 1) / size) * r.width +
+                ((y1 - y0 + 1) / size) * r.height) /
+              2 /
+              2,
+          };
+          const a = document
+            .querySelector(".hero__aura")!
+            .getBoundingClientRect();
+          return {
+            moonWidth: r.width,
+            visible,
+            aura: {
+              cx: a.left + a.width / 2,
+              cy: a.top + a.height / 2,
+              radius: a.width / 2,
+            },
+          };
+        });
+        const tolerance = m.moonWidth * 0.02;
+        expect(Math.abs(m.aura.cx - m.visible.cx)).toBeLessThanOrEqual(
+          tolerance,
+        );
+        expect(Math.abs(m.aura.cy - m.visible.cy)).toBeLessThanOrEqual(
+          tolerance,
+        );
+        // Hugging, with the glow tucked under the rim: never bigger than the
+        // moon, never more than 3 % of its width smaller.
+        expect(m.aura.radius).toBeLessThanOrEqual(
+          m.visible.radius + tolerance / 2,
+        );
+        expect(m.visible.radius - m.aura.radius).toBeLessThanOrEqual(
+          m.moonWidth * 0.03,
+        );
+      });
+    }
+
     test(`${path}: the body really travels along the orbit`, async ({
       page,
     }) => {
