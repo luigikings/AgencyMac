@@ -136,8 +136,10 @@ test.describe("Indexable pages: minimum SEO", () => {
   });
 });
 
-// RF-15 and RNF-3 on every page: never noindex, and no executable script. The
-// home pages carry one JSON-LD block (data, not code); the 404s none.
+// RF-15 and RNF-3 on every page: never noindex, and no executable script
+// except the deferred-animation entry module of the home pages (spec 004,
+// phase B). The home pages also carry one JSON-LD block (data, not code); the
+// 404s carry nothing.
 test.describe("All pages", () => {
   for (const { path, kind } of pages) {
     test(`${path}: no noindex and no executable scripts`, async ({ page }) => {
@@ -150,7 +152,9 @@ test.describe("All pages", () => {
         .evaluateAll((scripts) =>
           scripts.map((script) => script.getAttribute("type")),
         );
-      expect(types).toEqual(kind === "home" ? ["application/ld+json"] : []);
+      expect(types).toEqual(
+        kind === "home" ? ["application/ld+json", "module"] : [],
+      );
     });
   }
 });

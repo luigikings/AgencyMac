@@ -111,49 +111,49 @@ Aprobaciones: `sharp` 0.35.5 (raíz) se instala en T3 y `gsap` 3.15.0 y `lenis` 
 
 ## Fase B: animación
 
-- [ ] **T16. Licencia, dependencias y medición (primera de la fase B): (1) descargar el tarball de `gsap` 3.15.0 a una carpeta temporal fuera del repo y **leer su `LICENSE`**; anotar identificador, enlace y condiciones en el plan (sección 0.2). **Si no permite uso comercial en un repositorio público o exige algo que no se cumple, PARAR y volver al usuario sin instalar nada.** (2) Si es válida: instalar `gsap` 3.15.0 y `lenis` 1.3.26 exactas en `apps/web`. (3) Spike de medición: construir un módulo mínimo que importe GSAP + ScrollTrigger (y Lenis) y medir su peso comprimido; fijar con él el presupuesto de JS.** RNF-5, RNF-12
+- [x] **T16. Licencia, dependencias y medición (primera de la fase B): (1) descargar el tarball de `gsap` 3.15.0 a una carpeta temporal fuera del repo y **leer su `LICENSE`**; anotar identificador, enlace y condiciones en el plan (sección 0.2). **Si no permite uso comercial en un repositorio público o exige algo que no se cumple, PARAR y volver al usuario sin instalar nada.** (2) Si es válida: instalar `gsap` 3.15.0 y `lenis` 1.3.26 exactas en `apps/web`. (3) Spike de medición: construir un módulo mínimo que importe GSAP + ScrollTrigger (y Lenis) y medir su peso comprimido; fijar con él el presupuesto de JS.** RNF-5, RNF-12
   - Hecho cuando:
     - El texto de la licencia está leído y anotado, y la decisión (continuar o parar) queda escrita.
     - `pnpm install --frozen-lockfile` funciona con las versiones exactas y sin `^`; la comprobación de "no publicada el mismo día" se anota.
     - El peso medido (gzip) de GSAP + ScrollTrigger y de Lenis queda anotado y el presupuesto de la sección 8 del plan se fija con él. Si el total supera 60 KB o el TBT del spike pasa de 200 ms, se para y se avisa (opción B o C del plan).
     - `LICENSE-BRAND.md` cita la licencia de GSAP con su identificador real.
 
-- [ ] **T17. Lógica pura de movimiento: primero `src/lib/motion/*.test.ts` (`resolveActiveStop`: antes, dentro, hueco, después, vacío y NaN; `travelerTarget`: centro dentro del planeta y limitado al contenedor; `revealPlan`: 1 y 2 columnas y alternancia; `isBelowFold`); después `active-stop.ts`, `traveler.ts`, `reveal-plan.ts` y `motion-config.ts` (`LOAD_DELAY_MS`, `GESTURE_MS = 600`, línea de referencia, margen del pliegue).** RF-34, RF-35, RF-36
+- [x] **T17. Lógica pura de movimiento: primero `src/lib/motion/*.test.ts` (`resolveActiveStop`: antes, dentro, hueco, después, vacío y NaN; `travelerTarget`: centro dentro del planeta y limitado al contenedor; `revealPlan`: 1 y 2 columnas y alternancia; `isBelowFold`); después `active-stop.ts`, `traveler.ts`, `reveal-plan.ts` y `motion-config.ts` (`LOAD_DELAY_MS`, `GESTURE_MS = 600`, línea de referencia, margen del pliegue).** RF-34, RF-35, RF-36
   - Hecho cuando:
     - Los tests pasaron de rojo a verde y las funciones no importan DOM, GSAP ni la fecha.
     - `motion-config.ts` es la única fuente de las constantes de tiempo y posición.
 
-- [ ] **T18. Carga diferida y aparición de bloques: primero `motion.spec.ts` (con movimiento reducido no se descarga el código de animación; sin él, no se descarga nada de GSAP antes de `load` y sí después de `load` + retardo; el HTML inicial ya contiene todo y ningún elemento arranca invisible; los bloques situados bajo el pliegue aparecen desde lados opuestos al entrar y terminan visibles; CLS ≤ 0,1); después el script de entrada (~1 KB: espera `load` y `LOAD_DELAY_MS`, comprueba el movimiento reducido y hace `import()` dinámico), el módulo con GSAP y ScrollTrigger que aplica el estado inicial **solo a los bloques bajo el pliegue** (`isBelowFold`, `revealPlan`) y los anima, y el atributo `data-reveal` en los bloques de servicios.** RF-31, RF-35, RNF-7
+- [x] **T18. Carga diferida y aparición de bloques: primero `motion.spec.ts` (con movimiento reducido no se descarga el código de animación; sin él, no se descarga nada de GSAP antes de `load` y sí después de `load` + retardo; el HTML inicial ya contiene todo y ningún elemento arranca invisible; los bloques situados bajo el pliegue aparecen desde lados opuestos al entrar y terminan visibles; CLS ≤ 0,1); después el script de entrada (~1 KB: espera `load` y `LOAD_DELAY_MS`, comprueba el movimiento reducido y hace `import()` dinámico), el módulo con GSAP y ScrollTrigger que aplica el estado inicial **solo a los bloques bajo el pliegue** (`isBelowFold`, `revealPlan`) y los anima, y el atributo `data-reveal` en los bloques de servicios.** RF-31, RF-35, RNF-7
   - Hecho cuando:
     - Los tests pasaron de rojo a verde y el JS antes de `load` es ≤ 3 KB comprimidos.
     - Los bloques visibles al cargar no se tocan y, si se llega por un enlace a una sección, el contenido ya está visible.
     - Con el atributo de reducción de movimiento activado a mitad de la visita, los bloques quedan visibles y el módulo se desactiva.
 
-- [ ] **T19. Planeta activo y Mac viajero: primero `motion.spec.ts` (con animación activa y sin movimiento reducido, al desplazarse a cada bloque `data-active-planet` es el esperado y el centro de Mac queda dentro de la ilustración del planeta; antes del primero es el primero y después del último es el último; sin animación no existe el atributo ni el Mac viajero; recalcula al girar o redimensionar); después el Mac viajero creado por JS (`alt=""`, `aria-hidden`, posición absoluta en el contenedor de servicios) con `travelerTarget` y `resolveActiveStop` sobre `ScrollTrigger`.** RF-34, RNF-9, RNF-10
+- [x] **T19. Planeta activo y Mac viajero: primero `motion.spec.ts` (con animación activa y sin movimiento reducido, al desplazarse a cada bloque `data-active-planet` es el esperado y el centro de Mac queda dentro de la ilustración del planeta; antes del primero es el primero y después del último es el último; sin animación no existe el atributo ni el Mac viajero; recalcula al girar o redimensionar); después el Mac viajero creado por JS (`alt=""`, `aria-hidden`, posición absoluta en el contenedor de servicios) con `travelerTarget` y `resolveActiveStop` sobre `ScrollTrigger`.** RF-34, RNF-9, RNF-10
   - Hecho cuando:
     - Los tests pasaron de rojo a verde en ES y EN, a 375 px y en escritorio.
     - Sin desbordamiento horizontal a 320 y 375 px con Mac viajero activo y CLS ≤ 0,1.
     - Revisión visual del viaje de Mac anotada para el usuario.
 
-- [ ] **T20. Sin JS y con movimiento reducido: primero `motion.spec.ts` (con el código de animación bloqueado, todo el contenido visible y con opacidad completa; con movimiento reducido, ningún elemento con transición o animación de duración > 0, Mac estático y desplazamiento nativo) y la comprobación en `home.spec.ts` de que no existe ninguna regla que oculte contenido al cargar; después los ajustes necesarios.** RF-32, RF-33, RF-38
+- [x] **T20. Sin JS y con movimiento reducido: primero `motion.spec.ts` (con el código de animación bloqueado, todo el contenido visible y con opacidad completa; con movimiento reducido, ningún elemento con transición o animación de duración > 0, Mac estático y desplazamiento nativo) y la comprobación en `home.spec.ts` de que no existe ninguna regla que oculte contenido al cargar; después los ajustes necesarios.** RF-32, RF-33, RF-38
   - Hecho cuando:
     - Los tests pasaron de rojo a verde.
     - Con JavaScript desactivado la página es idéntica a la de la fase A.
     - Una revisión de las hojas de estilo confirma que ninguna regla pone `opacity: 0` ni `visibility: hidden` en contenido inicial.
 
-- [ ] **T21. Scroll suave con Lenis e INP: primero `motion.spec.ts` y `budget.spec.ts` (Lenis solo con puntero fino y sin movimiento reducido; "Descubre cómo", "Quiero despegar" y los enlaces de navegación llegan a su sección; Tab, Espacio, flechas, Inicio y Fin desplazan; ninguna interacción de la prueba pasa de 200 ms según `PerformanceObserver` de tipo `event`); después Lenis integrado con ScrollTrigger (`gsap.ticker`, `lagSmoothing(0)`), importado con `import()` dentro del módulo solo para puntero fino.** RF-37, RNF-4
+- [x] **T21. Scroll suave con Lenis e INP: primero `motion.spec.ts` y `budget.spec.ts` (Lenis solo con puntero fino y sin movimiento reducido; "Descubre cómo", "Quiero despegar" y los enlaces de navegación llegan a su sección; Tab, Espacio, flechas, Inicio y Fin desplazan; ninguna interacción de la prueba pasa de 200 ms según `PerformanceObserver` de tipo `event`); después Lenis integrado con ScrollTrigger (`gsap.ticker`, `lagSmoothing(0)`), importado con `import()` dentro del módulo solo para puntero fino.** RF-37, RNF-4
   - Hecho cuando:
     - Los tests pasaron de rojo a verde y en táctil (emulado) Lenis no se descarga.
     - Revisión **manual** anotada de la búsqueda en la página (Ctrl+F) y de la sensación del desplazamiento con ratón.
     - El INP de laboratorio máximo queda anotado.
 
-- [ ] **T22. Gesto de Mac y axe tras revelar todo: primero `motion.spec.ts` (al pulsar a Mac el atributo `data-mac-gesture` pasa a `playing` y vuelve a quedar vacío a los 600 ms ± margen, sin cambiar el texto; con movimiento reducido no se activa) y `a11y.spec.ts` (axe en `/` y `/en/` antes y después de recorrer toda la página con la animación activa, con `color-contrast` en `passes`); después el gesto con GSAP y los ajustes.** RF-36, RNF-8
+- [x] **T22. Gesto de Mac y axe tras revelar todo: primero `motion.spec.ts` (al pulsar a Mac el atributo `data-mac-gesture` pasa a `playing` y vuelve a quedar vacío a los 600 ms ± margen, sin cambiar el texto; con movimiento reducido no se activa) y `a11y.spec.ts` (axe en `/` y `/en/` antes y después de recorrer toda la página con la animación activa, con `color-contrast` en `passes`); después el gesto con GSAP y los ajustes.** RF-36, RNF-8
   - Hecho cuando:
     - Los tests pasaron de rojo a verde en ES y EN.
     - axe sin infracciones ni `color-contrast` incompleto con la animación activa.
     - El gesto se ve en la revisión visual y no mueve ningún texto.
 
-- [ ] **T23. Presupuestos, calidad y cierre: `budget.spec.ts` completo (JS antes de `load`, JS total, CSS, imágenes al cargar y totales) y `pnpm quality`; actualización de `apps/web/AGENTS.md` (se quita "sin JavaScript de cliente"; reglas de animación, carga diferida y presupuestos), `LICENSE-BRAND.md` y `MEMORY.md`; ampliación del smoke de staging si procede; validación RF por RF con checklist de seo-tecnico y cierre.** RF-31, RF-37, RNF-3, RNF-4, RNF-5, RNF-6, RNF-12
+- [x] **T23. Presupuestos, calidad y cierre: `budget.spec.ts` completo (JS antes de `load`, JS total, CSS, imágenes al cargar y totales) y `pnpm quality`; actualización de `apps/web/AGENTS.md` (se quita "sin JavaScript de cliente"; reglas de animación, carga diferida y presupuestos), `LICENSE-BRAND.md` y `MEMORY.md`; ampliación del smoke de staging si procede; validación RF por RF con checklist de seo-tecnico y cierre.** RF-31, RF-37, RNF-3, RNF-4, RNF-5, RNF-6, RNF-12
   - Hecho cuando:
     - `pnpm test` y `pnpm quality` terminan con código 0 (4 categorías ≥ 0,9, LCP ≤ 2,5 s, CLS ≤ 0,1, TBT ≤ 200 ms) y los presupuestos de la sección 8 del plan se cumplen (valores anotados).
     - Documentación al día y propuesta de mover a `AGENTS.md` lo que sea regla permanente.

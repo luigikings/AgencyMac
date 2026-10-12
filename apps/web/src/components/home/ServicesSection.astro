@@ -35,6 +35,7 @@ const imageOf = (name: string) => {
     <article
       class:list={["service", { "service--flip": index % 2 === 1 }]}
       data-planet={service.id}
+      data-reveal
       style={`background:var(${cssVariableName(service.bgToken)})`}
     >
       <div class="service__inner">
@@ -60,7 +61,11 @@ const imageOf = (name: string) => {
 
 <style>
   /* Colours come only from the brand tokens (src/styles/tokens.ts). */
+  /* Container of the travelling Mac (added by script): it is positioned
+     inside and never widens the page. */
   .services {
+    position: relative;
+    overflow-x: clip;
     background: var(--color-bg);
   }
 
@@ -80,6 +85,11 @@ const imageOf = (name: string) => {
     margin: 0;
     max-width: 40rem;
     font-size: 1.125rem;
+  }
+
+  /* The reveal moves the halves sideways: never let that widen the page. */
+  .service {
+    overflow-x: clip;
   }
 
   .service__inner {

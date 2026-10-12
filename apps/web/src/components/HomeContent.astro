@@ -18,3 +18,8 @@ const { locale } = Astro.props;
 <ProjectsSection locale={locale} />
 <TeamSection locale={locale} />
 <ContactSection locale={locale} />
+
+<!-- Deferred animation layer (spec 004): the content above needs none of it. -->
+<script>
+  import "../scripts/motion-entry";
+</script>

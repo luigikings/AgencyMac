@@ -148,4 +148,16 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
     outline: 3px solid var(--color-button-hover);
     outline-offset: 2px;
   }
+
+  /* RF-33: with reduced motion nothing moves in CSS and the scroll is the
+     browser's own. Motion in CSS is only ever added under no-preference. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition: none !important;
+      animation: none !important;
+      scroll-behavior: auto !important;
+    }
+  }
 </style>

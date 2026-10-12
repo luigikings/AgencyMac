@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { localizePath, t } from "../src/lib/i18n";
 import { NAV_SECTIONS, PROJECTS, SERVICES, TEAM } from "../src/lib/site-data";
+import { findHidingRules } from "../src/styles/motion-css";
 import { colors } from "../src/styles/tokens";
 import { homePages } from "./pages";
 
@@ -529,6 +530,33 @@ test.describe("Projects and team on a phone", () => {
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
       expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
+});
+
+// RF-32, RF-38: the stylesheets the browser really receives (linked and
+// inline) contain no rule that hides content on load.
+test.describe("Served stylesheets", () => {
+  for (const { path } of homePages) {
+    test(`${path}: no rule sets opacity 0, visibility hidden or display none`, async ({
+      request,
+    }) => {
+      const html = await (await request.get(path)).text();
+      const sheets = [
+        ...[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(
+          (match) => match[1]!,
+        ),
+      ];
+      const links = [
+        ...html.matchAll(/<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g),
+      ].map((match) => match[1]!);
+      for (const href of links) {
+        sheets.push(await (await request.get(href)).text());
+      }
+      expect(sheets.length).toBeGreaterThan(0);
+      for (const css of sheets) {
+        expect(findHidingRules(css)).toEqual([]);
+      }
     });
   }
 });

@@ -56,7 +56,11 @@ describe("apps/web/AGENTS.md", () => {
     }
   });
 
-  it("still says there is no client-side JavaScript until phase B", () => {
-    expect(rules).toMatch(/sin JavaScript de cliente/);
+  // Phase B of spec 004 arrived: the only client JavaScript is the deferred
+  // animation layer, with its budget and GSAP's licence notice documented.
+  it("documents the deferred animation layer as the only client JavaScript", () => {
+    expect(rules).toMatch(/único JavaScript de cliente/);
+    expect(rules).toMatch(/≤ 3 KB de JS antes de `load`/);
+    expect(rules).toMatch(/@license/);
   });
 });

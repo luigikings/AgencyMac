@@ -7,6 +7,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - 001-base (d81ca25): monorepo pnpm con `apps/web` (Astro) y `apps/control` (React + Vite). Comandos en `AGENTS.md`.
 - 002-web-base (72fc218): inicio y 404 en ES (`/`) y EN (`/en/`), tokens de marca, fuentes autoalojadas, SEO base, axe limpio, Lighthouse 100. (El cian provisional del logo se eliminó en la 004: la marca no lo usa.)
 - 003-deploy-staging cerrada (2026-10-11): CI en GitHub Actions en cada push y PR a main; staging activo en el Worker `agencymac-staging` (`*.workers.dev`, noindex), con despliegue automático y smoke test real en cada push a main en verde. Alta y comportamiento en `docs/staging.md`. Vitest 407, Playwright 65.
+- 004-web-portada (fases A y B hechas, sin cerrar: falta push, revisión del usuario en el staging y VEREDICTO): portada real (hero, 3 servicios, proyectos, equipo, contacto), marca, SEO y capa de animación diferida (GSAP + ScrollTrigger + Lenis). Lighthouse 100/100/100/100, LCP ~1,5 s, CLS 0, TBT 0; JS 52,6 KB gzip (1,1 KB antes de `load`).
 - Referencias: Notion de la agencia (URL privada en `MEMORY.local.md`, ignorado). Portfolio: chatarreriametalrenova.es y magnarwargames.com (permisos concedidos).
 
 ## Decisiones (y por qué)
@@ -22,8 +23,11 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - 002/003: servidor local propio (`serve-static.mjs`, 4322) que imita Workers static assets (307, `/404` → 200; D17 de la 003: se aceptó el comportamiento de Cloudflare en vez de código de Worker).
 - 003: despliega solo GitHub Actions; wrangler como devDependency (paridad en local con `wrangler dev`), solo el script de `workerd` autorizado. `noindex` solo en la copia `.staging/`, nunca en `dist`; una sola build por CI (`PREBUILT_DIST=1`).
 - 003: secretos solo en el entorno "staging" restringido a main; la comprobación previa omite el despliegue en verde si falta un secreto o el commit no es la punta de main. La URL se compone con el secreto del subdominio y nunca se imprime ni se versiona.
+- 004: GSAP con licencia "Standard no charge" (uso comercial gratis; su tarball no trae LICENSE, solo el enlace); Vite quita su `@license` al minificar: se conserva con `comments: { legal: true }`. Contenido siempre visible en el HTML: JS solo oculta bloques bajo el pliegue. CTA a `#contact` hasta la spec 006.
 
 ## Aprendizajes y errores a evitar
+
+- `gsap.matchMedia` con el breakpoint como condición devolvía la página arriba al girar el móvil: solo el movimiento reducido es condición. El CSS de Lenis se inyecta con `?inline`, no por import normal (Astro lo metía en el HTML de todos).
 
 - La web antigua tenía título "WebApplication1" y casi nada indexable: no repetirlo.
 - En agentes, `cmd.exe` no atraviesa la junction de fnm: anteponer al PATH la ruta real de Node.
@@ -35,11 +39,12 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 
 ## Próximos pasos
 
-- Cuando el usuario la pida: web pública con contenido real (fase 1); después Centro de Control v1 con el CRM (fase 2) e integraciones (fase 3). Blog SEO más adelante.
+- Cerrar la 004 tras el push y la revisión del usuario. Después: formulario de contacto (spec 006), páginas de servicio (005); más adelante Centro de Control v1 con el CRM (fase 2) e integraciones (fase 3). Blog SEO más adelante.
 
 ## Pendientes del usuario
 
 - Renovar el token de Cloudflare antes de que caduque (≤ 12 meses; fecha anotada en privado) según `docs/staging.md`.
 - Comprobaciones manuales de la 002, si siguen pendientes: RF-21 (recorrido con Tab) y RF-23 (revisión a 375 px y escritorio; la revisión de staging del 2026-10-11 puede cubrirla).
+- 004: tras el push, revisar el staging desde el móvil con y sin movimiento reducido, probar a mano Ctrl+F y la sensación del scroll con ratón, y aprobar por escrito textos, recortes y colores.
 - Alta legal (empresa o autónomo) ANTES de lanzar en agencymac.com; correo y WhatsApp de empresa; paquetes y precios (propuesta pendiente de Joni).
 - Migrar el DNS de agencymac.com (hoy en Vercel) a Cloudflare al lanzar.

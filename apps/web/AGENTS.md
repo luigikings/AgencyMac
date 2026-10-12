@@ -4,7 +4,7 @@ Web pública de AgencyMac: la carta de presentación de la agencia ante clientes
 
 ## Stack
 
-- Astro 7 con salida estática (`output: "static"`), sin JavaScript de cliente por ahora (cierto hasta la fase B de la spec 004). GSAP/ScrollTrigger y Lenis llegan en esa fase B; Rive queda fuera.
+- Astro 7 con salida estática (`output: "static"`). El único JavaScript de cliente es la capa de animación diferida de la portada (spec 004, fase B): `src/scripts/motion-entry.ts` (~1 KB; espera `load` + `LOAD_DELAY_MS`, no descarga nada con movimiento reducido) y `src/scripts/motion/home-motion.ts` (GSAP + ScrollTrigger; Lenis llegará en T21). Las constantes están en `src/lib/motion/motion-config.ts`. Presupuesto: ≤ 3 KB de JS antes de `load` y ≤ 60 KB en total. El bundle debe conservar la cabecera `@license` de GSAP (`astro.config.mjs`, `comments: { legal: true }`; lo vigila `e2e/motion.spec.ts`). Rive queda fuera.
 - Tests: Vitest para la lógica (`src/lib/*.test.ts`, `src/styles/*.test.ts`) y Playwright + axe-core para e2e (`e2e/`, lista de páginas en `e2e/pages.ts`).
 - Auditoría: Lighthouse CI (`lighthouserc.cjs`) de `/` y `/en/` con el `chrome-headless-shell` de Playwright, perfil móvil, mediana de 3 ejecuciones; además de las 4 categorías ≥ 0.9 exige LCP ≤ 2500 ms, CLS ≤ 0.1, TBT ≤ 200 ms y `font-display`.
 
@@ -58,6 +58,15 @@ Web pública de AgencyMac: la carta de presentación de la agencia ante clientes
 - Los textos son la tabla "Textos propuestos" de `specs/004-web-portada/spec.md`: `translations.test.ts` la compara con `translations.ts` clave por clave. Sin precios ni datos de contacto (`src/lib/copy-rules.ts` los vigila en todos los textos).
 - Cada servicio es una banda de color sólido de su token (`planetHexawebBg`, `planetRankiaBg`, `planetAdaraBg`); no hay enlaces internos falsos y los dos externos (proyectos) llevan `target="_blank"` y `rel="noopener"`.
 - Metadatos sociales (`buildSocialMeta`), JSON-LD `Organization` sin teléfono, correo ni dirección (`structured-data.ts`, ensamblados en `home-seo.ts`), `sitemap.xml` y `robots.txt` (endpoints en `src/pages/`, funciones puras en `sitemap.ts`). Las URL absolutas salen siempre de `site`; en los tests solo se comprueba la ruta en el servidor de pruebas, nunca se pide nada a `agencymac.com`.
+
+## Animación (spec 004, fase B)
+
+- La capa de animación es opcional y diferida: `motion-entry.ts` espera `load` + `LOAD_DELAY_MS` (1000 ms), no descarga nada con movimiento reducido y hace `import()` de `motion/home-motion.ts` (GSAP + ScrollTrigger). El HTML y el CSS dejan todo visible; solo los bloques `[data-reveal]` bajo el pliegue adoptan el estado inicial oculto, aplicado por JS, y terminan visibles. Ninguna regla CSS oculta contenido (`motion-css.test.ts`).
+- La lógica pura (planeta activo, destino de Mac, plan de aparición, constantes) vive en `src/lib/motion/`; `motion-config.ts` es la única fuente de las constantes de tiempo y posición. No importa DOM, GSAP ni la fecha.
+- Mac viajero (creado por JS, `alt=""`, `aria-hidden`), `data-active-planet` en `#services` y gesto de Mac (`data-mac-gesture`, 0,6 s) existen solo con la capa activa y sin movimiento reducido. Con movimiento reducido a mitad de la visita todo se revierte (`gsap.matchMedia`) sin mover el scroll. El breakpoint NO es condición de `matchMedia` (provocaba un salto al inicio).
+- Lenis (`motion/smooth-scroll.ts`, fragmento aparte) solo con `(hover: hover) and (pointer: fine)` y sin movimiento reducido. Su CSS se inyecta desde ese módulo con `?inline`: nunca en la hoja base. Todo CSS con transiciones, animaciones o scroll suave va bajo `prefers-reduced-motion: no-preference`.
+- Presupuestos (`e2e/budget.spec.ts`, plan sección 8): JS antes de `load` ≤ 3 KB gzip, JS total ≤ 60 KB gzip, CSS ≤ 20 KB, imágenes al cargar ≤ 90 KB y totales ≤ 400 KB en 375 px, y cada interacción ≤ 200 ms (proxy de INP). Si algo no se cumple, se para y se avisa antes de subir el límite.
+- El bundle conserva la cabecera `@license` de GSAP (licencia en `LICENSE-BRAND.md`).
 
 ## Reglas
 

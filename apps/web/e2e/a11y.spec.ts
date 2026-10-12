@@ -135,3 +135,45 @@ test.describe("Accessibility after revealing the whole page", () => {
     }
   }
 });
+
+// RNF-8, RF-38 (phase B): the same check with the animation layer running
+// (the page still needs to be complete and readable while it moves). Axe runs
+// before anything is revealed and after walking the whole page once every
+// block has finished sliding in.
+test.describe("Accessibility with the animation active", () => {
+  for (const { path } of homePages) {
+    for (const stage of ["before", "after"] as const) {
+      test(`${path}: axe ${stage} walking the page with animation`, async ({
+        page,
+      }) => {
+        await page.goto(path);
+        await page.waitForSelector('html[data-motion="on"]', {
+          timeout: 10_000,
+        });
+        if (stage === "after") {
+          await revealAll(page);
+          // Every half of every block is fully opaque again.
+          await expect
+            .poll(() =>
+              page.evaluate(() =>
+                [
+                  ...document.querySelectorAll(
+                    "[data-reveal] .service__art, [data-reveal] .service__text",
+                  ),
+                ].every((el) => Number(getComputedStyle(el).opacity) === 1),
+              ),
+            )
+            .toBe(true);
+        } else {
+          // The traveller is part of the page now: it must not break axe.
+          await expect(page.locator("img[data-traveler]")).toHaveCount(1);
+        }
+        const results = await new AxeBuilder({ page }).analyze();
+        expect(results.violations).toEqual([]);
+        const ids = (list: { id: string }[]) => list.map(({ id }) => id);
+        expect(ids(results.passes)).toContain("color-contrast");
+        expect(ids(results.incomplete)).not.toContain("color-contrast");
+      });
+    }
+  }
+});

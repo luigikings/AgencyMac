@@ -39,11 +39,21 @@ function relocateNotFound() {
   };
 }
 
-// Static public website, no client-side JavaScript. Brand fonts are
-// self-hosted from src/assets/fonts (local provider, never a font CDN).
+// Static public website. The only client-side JavaScript is the deferred
+// animation layer of the home page (spec 004). Brand fonts are self-hosted
+// from src/assets/fonts (local provider, never a font CDN).
 export default defineConfig({
   site: "https://agencymac.com",
   output: "static",
   fonts: fontFamilies(fonts, fontProviders.local()),
   integrations: [relocateNotFound()],
+  vite: {
+    build: {
+      rollupOptions: {
+        // GSAP's licence forbids removing its notice (plan 0.2): keep the
+        // legal comments (`@license`) that minification drops by default.
+        output: { comments: { legal: true } },
+      },
+    },
+  },
 });
