@@ -1,6 +1,6 @@
 # Spec 004 — Portada real de la web pública
 
-Estado: aprobada (2026-10-12; los textos, los recortes y los colores de planeta siguen pendientes de aprobación visual del usuario)
+Estado: implementada (2026-10-12)
 
 Depende de: spec 002 (esqueleto bilingüe) y spec 003 (staging con despliegue automático en cada push a main), ambas implementadas.
 
@@ -221,6 +221,12 @@ Claves existentes que se conservan sin cambio de texto: `nav.label`, `nav.home`,
 - Recorrido con Tab completo (foco visible, orden lógico) en español e inglés.
 - Documentación al día: reglas de la web, aviso de licencias de marca y memoria del proyecto.
 - Lista de originales usados y de derivados revisada por el usuario: ningún original sin usar en el repositorio ni en su historial.
+
+### Cierre (2026-10-12)
+
+- VEREDICTO: APROBADO (validación RF por RF; CI en verde en los dos pushes; Lighthouse 100/100/100/100, LCP ~1,5 s, CLS 0, TBT 0).
+- Aprobados por el usuario en el chat: los textos propuestos, el aspecto de los recortes y los colores de fondo de los planetas.
+- Siguen como comprobaciones manuales del usuario (no automatizables, no bloquean el cierre): revisión en staging desde el móvil, que los dos enlaces de proyecto abren la web correcta, Ctrl+F y sensación del scroll con Lenis y recorrido con Tab.
 
 ## Decisiones de clarificación (para el plan)
 
