@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { PARTICLE_LIFE_MAX_MS, TIER_PARAMS } from "./fx-config";
+import { mulberry32 } from "../sky/rng";
+import {
+  PARTICLE_LIFE_MAX_MS,
+  SPARK_FILL_MS,
+  SPARK_SPEED_PX_MS,
+  TIER_PARAMS,
+} from "./fx-config";
 import {
   alphaAt,
   capFor,
   createPool,
   emitRate,
   sparkCap,
+  sparkLaunch,
+  sparksToEmit,
   spawn,
   step,
 } from "./particles";
@@ -165,5 +173,81 @@ describe("emitRate (RF-23)", () => {
   it("is 0 with no effects and for other kinds", () => {
     expect(emitRate("trail", "off", 400)).toBe(0);
     expect(emitRate("spark", "high", 400)).toBe(0);
+  });
+});
+
+describe("tone of a particle (RF-14)", () => {
+  it("is stored when spawned and travels with it when another dies", () => {
+    const pool = createPool(4);
+    spawn(pool, "trail", at, still, rng, { max: 4 }, 1);
+    spawn(pool, "burst", { x: 7, y: 7 }, still, rng, { max: 4 }, 3);
+    expect(pool.tone[0]).toBe(1);
+    expect(pool.tone[1]).toBe(3);
+    step(pool, pool.lifeMax[0]! + 1); // the trail dies, the burst moves down
+    expect(pool.alive).toBe(1);
+    expect(pool.tone[0]).toBe(3);
+  });
+
+  it("is 0 when none is given", () => {
+    const pool = createPool(2);
+    spawn(pool, "burst", at, still, rng, { max: 2 });
+    expect(pool.tone[0]).toBe(0);
+  });
+});
+
+describe("sparkLaunch (RF-14)", () => {
+  const center = { x: 300, y: 200 };
+
+  it("starts on the rim and flies outwards within the speed range", () => {
+    for (const value of [0, 0.13, 0.5, 0.77, 0.999]) {
+      const { origin, velocity } = sparkLaunch(() => value, center, 80);
+      const out = { x: origin.x - center.x, y: origin.y - center.y };
+      expect(Math.hypot(out.x, out.y)).toBeCloseTo(80, 5);
+      expect(out.x * velocity.x + out.y * velocity.y).toBeGreaterThan(0);
+      const speed = Math.hypot(velocity.x, velocity.y);
+      expect(speed).toBeGreaterThanOrEqual(SPARK_SPEED_PX_MS[0] - 1e-9);
+      expect(speed).toBeLessThanOrEqual(SPARK_SPEED_PX_MS[1] + 1e-9);
+    }
+  });
+
+  it("is the same for the same generator", () => {
+    const a = sparkLaunch(mulberry32(9), center, 50);
+    const b = sparkLaunch(mulberry32(9), center, 50);
+    expect(a).toEqual(b);
+  });
+});
+
+describe("sparksToEmit (RF-14)", () => {
+  it("emits nothing with a cap of 0 (low tier, touch)", () => {
+    expect(sparksToEmit(0, 1000, 0, 0)).toEqual({ count: 0, carry: 0 });
+  });
+
+  it("fills the cap from empty in SPARK_FILL_MS", () => {
+    let carry = 0;
+    let alive = 0;
+    for (let t = 0; t < SPARK_FILL_MS; t += 16) {
+      const out = sparksToEmit(carry, 16, 40, alive);
+      carry = out.carry;
+      alive += out.count;
+    }
+    expect(alive).toBeGreaterThanOrEqual(38);
+    expect(alive).toBeLessThanOrEqual(40);
+  });
+
+  it("never emits past the cap of the planet", () => {
+    for (const alive of [0, 10, 19, 20, 25]) {
+      const { count } = sparksToEmit(0.9, 5000, 20, alive);
+      expect(alive + count).toBeLessThanOrEqual(Math.max(20, alive));
+      expect(count).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("keeps the fraction left over between frames", () => {
+    const half = SPARK_FILL_MS / 40 / 2; // half a spark at a cap of 40
+    const first = sparksToEmit(0, half, 40, 0);
+    expect(first.count).toBe(0);
+    const second = sparksToEmit(first.carry, half, 40, 0);
+    expect(second.count).toBe(1);
+    expect(second.carry).toBeCloseTo(0, 5);
   });
 });

@@ -100,7 +100,8 @@ export type FontToken = {
   cssVariable: `--font-${string}`;
   /** Generic family used for the metric-adjusted fallback. */
   fallbacks: readonly string[];
-  variants: readonly FontVariant[];
+  /** At least one variant (Astro's local provider requires it). */
+  variants: readonly [FontVariant, ...FontVariant[]];
 };
 
 export const fonts = {
@@ -156,18 +157,31 @@ export function fontFamilies<P>(
   tokens: Record<string, FontToken>,
   provider: P,
 ) {
-  return Object.values(tokens).map((token) => ({
-    provider,
-    name: token.name,
-    cssVariable: token.cssVariable,
-    fallbacks: [...token.fallbacks],
-    options: {
-      variants: token.variants.map(({ weight, style, file }) => ({
-        weight,
-        style,
-        display: "swap" as const,
-        src: [FONTS_DIR + file],
-      })),
-    },
-  }));
+  type FamilyVariant = {
+    weight: FontVariant["weight"];
+    style: FontVariant["style"];
+    display: "swap";
+    src: [string];
+  };
+  const variant = ({ weight, style, file }: FontVariant): FamilyVariant => ({
+    weight,
+    style,
+    display: "swap",
+    src: [FONTS_DIR + file],
+  });
+  return Object.values(tokens).map((token) => {
+    // Written as first + rest so the type stays a non-empty list.
+    const [first, ...rest] = token.variants;
+    const variants: [FamilyVariant, ...FamilyVariant[]] = [
+      variant(first),
+      ...rest.map(variant),
+    ];
+    return {
+      provider,
+      name: token.name,
+      cssVariable: token.cssVariable,
+      fallbacks: [...token.fallbacks],
+      options: { variants },
+    };
+  });
 }

@@ -1,25 +1,30 @@
 import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { resolveActiveStop } from "../../lib/motion/active-stop";
 import {
   FINE_POINTER_QUERY,
   FOLD_MARGIN_PX,
   GESTURE_MS,
+  GSAP_AUTO_SLEEP_FRAMES,
   MARKER_RATIO,
   REVEAL_DURATION_S,
   REVEAL_OFFSET_PX,
-  REVEAL_START,
+  REVEAL_START_RATIO,
   TRAVELER_MIN_PX,
   TRAVELER_MOVE_S,
   TRAVELER_SIZE_RATIO,
   WIDE_QUERY,
 } from "../../lib/motion/motion-config";
 import { travelerTarget } from "../../lib/motion/traveler";
+import { pickTier } from "../../lib/fx/device-tier";
+import type { FxTier } from "../../lib/fx/fx-config";
 import {
   isBelowFold,
+  revealDue,
   revealPlan,
+  revealRootMargin,
   type RevealSide,
 } from "../../lib/motion/reveal-plan";
+import { createScrollHub, type ScrollHub } from "./scroll-hub";
 
 // Animation layer of the home page. It is downloaded after `load` plus a
 // delay and never when motion is reduced. Only `transform` and `opacity` are
@@ -38,9 +43,19 @@ function from(side: RevealSide): gsap.TweenVars {
   return { y: REVEAL_OFFSET_PX };
 }
 
-function revealBlocks(wide: boolean): void {
-  const blocks = gsap.utils.toArray<HTMLElement>("[data-reveal]");
-  blocks.forEach((block, index) => {
+// Reveal of the blocks below the fold (RF-35 of spec 004). Only those start
+// hidden. Spec 005, D19: an IntersectionObserver whose area ends at the start
+// line plays each reveal once; the single scroll handler is the safety net for
+// a jump past a block (no intersection ever happens), which must never leave
+// it hidden. `inContext` runs the tween inside the matchMedia context, so
+// reduced motion mid-visit reverts it too. Returns the cleanup function.
+function revealBlocks(
+  wide: boolean,
+  hub: ScrollHub,
+  inContext: (create: () => void) => void,
+): () => void {
+  const pending = new Map<Element, HTMLElement[]>();
+  gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((block, index) => {
     const top = block.getBoundingClientRect().top;
     if (!isBelowFold(top, window.innerHeight, FOLD_MARGIN_PX)) return;
     const art = block.querySelector<HTMLElement>(".service__art");
@@ -50,16 +65,58 @@ function revealBlocks(wide: boolean): void {
     const plan = revealPlan(index, wide ? 2 : 1);
     gsap.set(art, { opacity: 0, ...from(plan.image) });
     gsap.set(text, { opacity: 0, ...from(plan.text) });
-    // Both halves enter together, from opposite sides.
-    gsap.to([art, text], {
-      opacity: 1,
-      x: 0,
-      y: 0,
-      duration: REVEAL_DURATION_S,
-      ease: "power2.out",
-      scrollTrigger: { trigger: block, start: REVEAL_START, once: true },
-    });
+    pending.set(block, [art, text]);
   });
+  if (pending.size === 0) return () => {};
+
+  let observer: IntersectionObserver | undefined;
+  let removeListener: () => void = () => {};
+  const reveal = (block: Element) => {
+    const halves = pending.get(block);
+    if (!halves) return;
+    pending.delete(block);
+    observer?.unobserve(block);
+    // Both halves enter together, from opposite sides.
+    inContext(() => {
+      gsap.to(halves, {
+        opacity: 1,
+        x: 0,
+        y: 0,
+        duration: REVEAL_DURATION_S,
+        ease: "power2.out",
+      });
+    });
+    if (pending.size === 0) {
+      observer?.disconnect();
+      removeListener();
+    }
+  };
+
+  if ("IntersectionObserver" in window) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) reveal(entry.target);
+        }
+      },
+      { rootMargin: revealRootMargin(REVEAL_START_RATIO) },
+    );
+    pending.forEach((_, block) => observer!.observe(block));
+  }
+  removeListener = hub.add(() => {
+    for (const block of [...pending.keys()]) {
+      const top = block.getBoundingClientRect().top;
+      if (revealDue(top, window.innerHeight, REVEAL_START_RATIO)) {
+        reveal(block);
+      }
+    }
+  });
+  if (pending.size === 0) removeListener();
+  return () => {
+    observer?.disconnect();
+    removeListener();
+    pending.clear();
+  };
 }
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -82,7 +139,7 @@ function layoutBox(el: HTMLElement, moved: HTMLElement): Box {
 // without JavaScript there is no duplicate image. Decorative: empty alt,
 // hidden from assistive technology, absolutely positioned (no layout shift).
 // Returns the cleanup function.
-function travelingMac(): () => void {
+function travelingMac(hub: ScrollHub): () => void {
   const services = document.getElementById("services");
   const heroMac = document.querySelector<HTMLImageElement>(".hero__mac");
   const blocks = gsap.utils.toArray<HTMLElement>("#services [data-reveal]");
@@ -142,7 +199,10 @@ function travelingMac(): () => void {
         overwrite: true,
       });
     } else {
-      gsap.set(img, { x, y });
+      // Also ends a flight in progress: its end point was measured on the
+      // layout before a resize or a rotation, and it would win over this
+      // placement and leave Mac off the planet (spec 005, T16b).
+      gsap.set(img, { x, y, overwrite: true });
     }
   };
 
@@ -164,29 +224,19 @@ function travelingMac(): () => void {
     }
   };
 
-  // First placement: no animation. Afterwards: follow the scroll, and settle
-  // again (no animation) whenever the layout changes (resize, rotation).
+  // First placement: no animation. Afterwards: follow the core's single scroll
+  // handler, and settle again (no animation) once the layout changes after a
+  // resize or a rotation (spec 005, D19: no ScrollTrigger).
   update(false);
-  const trigger = ScrollTrigger.create({
-    trigger: services,
-    start: "top bottom",
-    end: "bottom top",
-    onUpdate: () => update(true),
-  });
-  const onRefresh = () => {
+  const removeScroll = hub.add(() => update(true));
+  const removeLayout = hub.onLayout(() => {
     if (active >= 0) place(active, false);
     update(false);
-  };
-  ScrollTrigger.addEventListener("refresh", onRefresh);
-  // The page may have scrolled before the layer arrived: settle on every
-  // scroll too, since the trigger only fires while the services are in view.
-  const onScroll = () => update(true);
-  window.addEventListener("scroll", onScroll, { passive: true });
+  });
 
   return () => {
-    window.removeEventListener("scroll", onScroll);
-    ScrollTrigger.removeEventListener("refresh", onRefresh);
-    trigger.kill();
+    removeScroll();
+    removeLayout();
     gsap.killTweensOf(img);
     img.remove();
     delete services.dataset.activePlanet;
@@ -261,23 +311,75 @@ function macGesture(): () => void {
   };
 }
 
-export function startMotion(): void {
-  gsap.registerPlugin(ScrollTrigger);
+// Device class of the visit (spec 005, RF-37), from the signals the browser
+// exposes. Memory, cores and data saver may be missing (Safari, Firefox):
+// pickTier treats them as "not limiting".
+function readTier(): FxTier {
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean };
+  };
+  const cores = nav.hardwareConcurrency;
+  const fontPx =
+    parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return pickTier({
+    reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    saveData: nav.connection?.saveData === true,
+    memoryGb: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,
+    cores: typeof cores === "number" && cores > 0 ? cores : null,
+    coarse: window.matchMedia("(pointer: coarse)").matches,
+    widthRem: window.innerWidth / fontPx,
+  });
+}
+
+// The effects layer (spec 005): marks the class in `data-fx-tier` and
+// downloads its own module unless the class is "off". Returns the cleanup; a
+// module that fails to load leaves no mark behind (RF-41).
+function effects(hub: ScrollHub): () => void {
   const root = document.documentElement;
-  // matchMedia reverts every tween, trigger and inline style created inside
-  // when motion becomes reduced mid-visit, so the content ends up exactly as
-  // in the HTML. The breakpoint is deliberately NOT a condition here: when a
-  // condition changes, GSAP's revert and rebuild of the triggers made the
-  // page jump back to the top. The layout changes (resize, rotation) are
-  // followed through ScrollTrigger's own `refresh` event instead.
+  const tier = readTier();
+  if (tier === "off") return () => {};
+  root.dataset.fxTier = tier;
+  let stop: (() => void) | undefined;
+  let cancelled = false;
+  import("../fx/fx-layer")
+    .then((module) => {
+      if (!cancelled) stop = module.startFx(tier, { hub });
+    })
+    .catch(() => {
+      // Blocked or offline: the page is complete without the effects.
+      if (!cancelled) delete root.dataset.fxTier;
+    });
+  return () => {
+    cancelled = true;
+    stop?.();
+    delete root.dataset.fxTier;
+  };
+}
+
+export function startMotion(): void {
+  const root = document.documentElement;
+  // At rest no frame is requested (spec 005, RF-39): nothing is hooked to
+  // GSAP's ticker, which then sleeps soon after the last tween.
+  gsap.config({ autoSleep: GSAP_AUTO_SLEEP_FRAMES });
+  // matchMedia reverts every tween and inline style created inside when
+  // motion becomes reduced mid-visit, so the content ends up exactly as in the
+  // HTML. The breakpoint is deliberately NOT a condition here: when a
+  // condition changes, GSAP's revert and rebuild made the page jump back to
+  // the top (spec 004). The layout changes (resize, rotation) are followed
+  // through the layout notice of the single scroll handler instead.
   gsap
     .matchMedia()
     .add({ motion: "(prefers-reduced-motion: no-preference)" }, (context) => {
       if (!context.conditions?.motion) return;
       root.dataset.motion = "on";
-      revealBlocks(isWide());
-      const removeTraveler = travelingMac();
+      const hub = createScrollHub();
+      const removeReveal = revealBlocks(isWide(), hub, (create) => {
+        context.add(create);
+      });
+      const removeTraveler = travelingMac(hub);
       const removeGesture = macGesture();
+      const removeEffects = effects(hub);
 
       // Smooth scrolling: only with a fine pointer (never on touch), and its
       // code is a separate download.
@@ -297,12 +399,15 @@ export function startMotion(): void {
         cancelled = true;
         stopSmooth?.();
         removeGesture();
+        removeEffects();
         const scrollY = window.scrollY;
+        removeReveal();
         removeTraveler();
+        hub.stop();
         delete root.dataset.motion;
-        // Reverting must never move the visitor. ScrollTrigger's refresh
-        // after the kill can leave the page at the top: put it back if (and
-        // only if) that jump to 0 happens.
+        // Reverting must never move the visitor (spec 004: ScrollTrigger's
+        // refresh after the kill could leave the page at the top). Kept as a
+        // cheap guard: put the page back if (and only if) a jump to 0 happens.
         const restore = () => {
           if (scrollY > 0 && window.scrollY === 0) window.scrollTo(0, scrollY);
         };

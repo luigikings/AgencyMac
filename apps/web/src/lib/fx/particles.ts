@@ -8,6 +8,8 @@ import {
   PARTICLE_KINDS,
   PARTICLE_LIFE_MS,
   PARTICLE_SIZE_PX,
+  SPARK_FILL_MS,
+  SPARK_SPEED_PX_MS,
   TIER_PARAMS,
   TRAIL_FULL_RATE_SPEED_PX_S,
   type FxTier,
@@ -31,6 +33,8 @@ export type Pool = {
   size: Float32Array;
   /** Index of the kind in PARTICLE_KINDS. */
   kind: Uint8Array;
+  /** Colour of the particle: an index in the painter's own list of tones. */
+  tone: Uint8Array;
 };
 
 export function createPool(max: number): Pool {
@@ -45,6 +49,7 @@ export function createPool(max: number): Pool {
     lifeMax: new Float32Array(max),
     size: new Float32Array(max),
     kind: new Uint8Array(max),
+    tone: new Uint8Array(max),
   };
 }
 
@@ -67,8 +72,10 @@ function write(
   origin: Point,
   velocity: Point,
   rng: Rng,
+  tone: number,
 ): void {
   const [lifeMin, lifeMax] = PARTICLE_LIFE_MS[kind];
+  pool.tone[i] = tone;
   const life = range(rng, lifeMin, lifeMax);
   pool.x[i] = origin.x;
   pool.y[i] = origin.y;
@@ -84,6 +91,7 @@ function write(
  * Adds a particle. Never goes past `caps.max` (the limit of the tier) or the
  * size of the pool. When full it takes the place of the oldest trail
  * particle; if there is none, nothing is created. Returns whether it was.
+ * `tone` is the colour index the painter gives it (0 by default).
  */
 export function spawn(
   pool: Pool,
@@ -92,11 +100,12 @@ export function spawn(
   velocity: Point,
   rng: Rng,
   caps: { max: number },
+  tone = 0,
 ): boolean {
   const limit = Math.min(caps.max, pool.max);
   if (limit <= 0) return false;
   if (pool.alive < limit) {
-    write(pool, pool.alive, kind, origin, velocity, rng);
+    write(pool, pool.alive, kind, origin, velocity, rng, tone);
     pool.alive++;
     return true;
   }
@@ -111,7 +120,7 @@ export function spawn(
     }
   }
   if (oldest < 0) return false;
-  write(pool, oldest, kind, origin, velocity, rng);
+  write(pool, oldest, kind, origin, velocity, rng, tone);
   return true;
 }
 
@@ -130,6 +139,7 @@ export function step(pool: Pool, dtMs: number): void {
       pool.lifeMax[i] = pool.lifeMax[last]!;
       pool.size[i] = pool.size[last]!;
       pool.kind[i] = pool.kind[last]!;
+      pool.tone[i] = pool.tone[last]!;
       pool.alive--;
       continue;
     }
@@ -139,6 +149,46 @@ export function step(pool: Pool, dtMs: number): void {
     pool.vy[i] = pool.vy[i]! + gravity * dtMs;
     i++;
   }
+}
+
+/**
+ * Where a spark of a planet starts and how it flies (RF-14): on a circle of
+ * `radius` around the centre, at a random angle, outwards at a speed in
+ * SPARK_SPEED_PX_MS.
+ */
+export function sparkLaunch(
+  rng: Rng,
+  centre: Point,
+  radius: number,
+): { origin: Point; velocity: Point } {
+  const angle = range(rng, 0, 2 * Math.PI);
+  const speed = range(rng, SPARK_SPEED_PX_MS[0], SPARK_SPEED_PX_MS[1]);
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  return {
+    origin: { x: centre.x + dx * radius, y: centre.y + dy * radius },
+    velocity: { x: dx * speed, y: dy * speed },
+  };
+}
+
+/**
+ * Sparks a planet under the cursor gives off in `dtMs` (RF-14): at the rate
+ * that fills `cap` in SPARK_FILL_MS, never past `cap` alive. `carry` is the
+ * fraction left from the frames before; when the cap stops the emission the
+ * fraction is dropped.
+ */
+export function sparksToEmit(
+  carry: number,
+  dtMs: number,
+  cap: number,
+  alive: number,
+): { count: number; carry: number } {
+  if (cap <= 0) return { count: 0, carry: 0 };
+  const total = carry + (Math.max(0, dtMs) * cap) / SPARK_FILL_MS;
+  const whole = Math.floor(total);
+  const room = Math.max(0, cap - alive);
+  if (whole > room) return { count: room, carry: 0 };
+  return { count: whole, carry: total - whole };
 }
 
 /** Opacity of particle `i`: 1 when born, 0 when its life ends. */

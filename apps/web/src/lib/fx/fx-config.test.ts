@@ -5,10 +5,18 @@ import {
   FX_TIERS,
   JUMP_MAX_MS,
   PARTICLE_LIFE_MAX_MS,
+  PLANET_GROW_TAU_MS,
+  PLANET_HOVER_SCALE,
+  PLANET_POINTER_DEPTH,
   SHOOTING_STAR_MS,
+  SPARK_FILL_MS,
+  SPARK_RIM_RATIO,
+  SPARK_SPEED_PX_MS,
+  SPARK_TONES,
   TIER_PARAMS,
   isFxTier,
 } from "./fx-config";
+import { colors } from "../../styles/tokens";
 
 describe("fx-config (spec 005)", () => {
   it("lists the device tiers from off to high", () => {
@@ -132,5 +140,51 @@ describe("other constants", () => {
   it("fades particles in under 0.6 s (RF-23) and jumps in at most 0.9 s (RF-31)", () => {
     expect(PARTICLE_LIFE_MAX_MS).toBeLessThan(600);
     expect(JUMP_MAX_MS).toBeLessThanOrEqual(900);
+  });
+});
+
+describe("planet growth and sparks (RF-14)", () => {
+  it("grows a planet under the cursor by 5 % at most", () => {
+    expect(PLANET_HOVER_SCALE).toBeGreaterThan(1);
+    expect(PLANET_HOVER_SCALE).toBeLessThanOrEqual(1.05);
+  });
+
+  it("grows and shrinks back in well under a second", () => {
+    expect(PLANET_GROW_TAU_MS).toBeGreaterThan(0);
+    // Within 1 % of the way after 5 time constants.
+    expect(5 * PLANET_GROW_TAU_MS).toBeLessThan(1000);
+  });
+
+  it("paints the sparks only with brand colour tokens", () => {
+    expect(SPARK_TONES.length).toBeGreaterThan(1);
+    for (const tone of SPARK_TONES) {
+      expect(Object.keys(colors)).toContain(tone);
+    }
+    expect(new Set(SPARK_TONES).size).toBe(SPARK_TONES.length);
+  });
+
+  it("launches the sparks outwards at a sane speed, from the rim", () => {
+    const [slow, fast] = SPARK_SPEED_PX_MS;
+    expect(slow).toBeGreaterThan(0);
+    expect(fast).toBeGreaterThan(slow);
+    expect(SPARK_RIM_RATIO).toBeGreaterThan(0);
+    expect(SPARK_RIM_RATIO).toBeLessThanOrEqual(0.5);
+    expect(SPARK_FILL_MS).toBeGreaterThan(0);
+  });
+});
+
+describe("planet parallax depths (RF-13)", () => {
+  it("has a depth in (0, 1] for each planet, all different", () => {
+    const depths = Object.values(PLANET_POINTER_DEPTH);
+    expect(Object.keys(PLANET_POINTER_DEPTH).sort()).toEqual([
+      "adara",
+      "hexaweb",
+      "rankia",
+    ]);
+    for (const depth of depths) {
+      expect(depth).toBeGreaterThan(0);
+      expect(depth).toBeLessThanOrEqual(1);
+    }
+    expect(new Set(depths).size).toBe(3);
   });
 });

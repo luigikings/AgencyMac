@@ -29,7 +29,7 @@ const { locale } = Astro.props;
       <p class="hero__subtitle" data-sky-text>
         {t(locale, "hero.subtitle")}
       </p>
-      <a class="hero__discover" href={DISCOVER_TARGET}>
+      <a class="hero__discover" href={DISCOVER_TARGET} data-sky-text>
         {t(locale, "hero.discover")}
       </a>
     </div>
@@ -83,6 +83,10 @@ const { locale } = Astro.props;
   /* Colours come only from the brand tokens (src/styles/tokens.ts). */
   .hero {
     background: var(--color-bg);
+    /* A paused animation (RF-15) can keep a decoration where a previous window
+       size left it: never let that widen the page. `clip` makes no stacking
+       context and no scroll container. */
+    overflow-x: clip;
   }
 
   .hero__inner {
@@ -387,7 +391,7 @@ const { locale } = Astro.props;
     }
 
     .hero__spark {
-      animation: hero-spark 0.55s ease-out 1.2s forwards;
+      animation: hero-spark 0.55s ease-out 1.2s;
     }
 
     .hero__flame {

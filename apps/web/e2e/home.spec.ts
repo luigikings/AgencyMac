@@ -217,7 +217,7 @@ test.describe("Hero", () => {
       expect(hidden).toEqual([]);
     });
 
-    test(`${path}: no text sits on a gradient or an image`, async ({
+    test(`${path}: no text sits on an image, and text on a gradient is a sky text (RF-8)`, async ({
       page,
     }) => {
       await page.goto(path);
@@ -226,12 +226,18 @@ test.describe("Hero", () => {
         return textElements
           .map((element) => {
             let node: Element | null = element;
+            let gradient = false;
             while (node) {
               const image = getComputedStyle(node).backgroundImage;
-              if (image !== "none") return element.tagName;
+              if (image.includes("url(")) return element.tagName;
+              if (image !== "none") gradient = true;
               node = node.parentElement;
             }
-            return null;
+            // A text over a gradient must be marked: its contrast is measured
+            // on the pixels (sky-ambients.spec.ts).
+            return gradient && !element.hasAttribute("data-sky-text")
+              ? element.tagName
+              : null;
           })
           .filter(Boolean);
       });
@@ -327,7 +333,8 @@ async function checkServiceBands(
       };
     });
     expect(style.color).toBe(hexToRgb(colors[service.bgToken].value));
-    expect(style.image).toBe("none");
+    // No picture under the band; the sky only adds gradients of tokens (RF-5).
+    expect(style.image).not.toContain("url(");
     expect(style.width).toBe(viewportWidth);
   }
 }
@@ -401,7 +408,7 @@ test.describe("Services", () => {
       }
     });
 
-    test(`${path}: no text sits on a gradient or an image`, async ({
+    test(`${path}: no text sits on an image, and text on a gradient is a sky text (RF-8)`, async ({
       page,
     }) => {
       await page.goto(path);
@@ -409,17 +416,22 @@ test.describe("Services", () => {
         .locator("section#services")
         .evaluate((section) =>
           [...section.querySelectorAll("h2, h3, p, span")]
+            // The decoration (halo, orbit, moons) carries no text.
+            .filter((element) => !element.closest('[aria-hidden="true"]'))
             .filter((element) => {
+              let gradient = false;
               for (
                 let node: Element | null = element;
                 node;
                 node = node.parentElement
               ) {
-                if (getComputedStyle(node).backgroundImage !== "none") {
-                  return true;
-                }
+                const image = getComputedStyle(node).backgroundImage;
+                if (image.includes("url(")) return true;
+                if (image !== "none") gradient = true;
               }
-              return false;
+              // A text over a gradient must be a marked sky text: its
+              // contrast is measured on the pixels (sky-ambients.spec.ts).
+              return gradient && !element.hasAttribute("data-sky-text");
             })
             .map((element) => element.tagName),
         );

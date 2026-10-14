@@ -19,7 +19,9 @@ const { locale } = Astro.props;
     <p class="contact__body" data-sky-text>
       {t(locale, "contact.body")}
     </p>
-    <p class="contact__status">{t(locale, "contact.status")}</p>
+    <p class="contact__status" data-sky-text>
+      {t(locale, "contact.status")}
+    </p>
     <CtaButton locale={locale} />
   </div>
 </section>

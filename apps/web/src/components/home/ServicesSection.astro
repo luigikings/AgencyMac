@@ -38,20 +38,40 @@ const imageOf = (name: string) => {
       class:list={["service", { "service--flip": index % 2 === 1 }]}
       data-planet={service.id}
       data-reveal
-      style={`background:var(${cssVariableName(service.bgToken)})`}
+      style={`background-color:var(${cssVariableName(service.bgToken)})`}
     >
       <div class="service__inner">
         <div class="service__art">
-          <BrandPicture
-            src={imageOf(service.image)}
-            alt={t(locale, service.altKey)}
-            widths={[320, 480, 640]}
-            sizes="(min-width: 48rem) 20rem, 80vw"
-            class="service__image"
-          />
+          {/* Three layers (plan D17): .service__art is for the reveal of the
+              004, .service__planet for the parallax of the effects layer, and
+              the picture and the image for the CSS float and turn. */}
+          <div class="service__planet">
+            <div class="service__halo" aria-hidden="true" />
+            <BrandPicture
+              src={imageOf(service.image)}
+              alt={t(locale, service.altKey)}
+              widths={[320, 480, 640]}
+              sizes="(min-width: 48rem) 20rem, 80vw"
+              class="service__image"
+            />
+            <div class="service__orbit" aria-hidden="true">
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                focusable="false"
+              >
+                <ellipse cx="50" cy="50" rx="46" ry="37" />
+              </svg>
+              {Array.from({ length: service.moons }, (_, moon) => (
+                <span class="service__moon" data-moon={moon + 1} />
+              ))}
+            </div>
+          </div>
         </div>
         <div class="service__text">
-          <p class="service__tag">{t(locale, service.tagKey)}</p>
+          <p class="service__tag" data-sky-text>
+            {t(locale, service.tagKey)}
+          </p>
           <h3 data-sky-text>{service.name}</h3>
           <p class="service__role" data-sky-text>
             {t(locale, service.roleKey)}
@@ -72,7 +92,8 @@ const imageOf = (name: string) => {
   .services {
     position: relative;
     overflow-x: clip;
-    background: var(--color-bg);
+    /* The intro sits on the base of the first planet: the hero fades into it. */
+    background: var(--color-planet-hexaweb-bg);
   }
 
   .services__intro {
@@ -115,10 +136,223 @@ const imageOf = (name: string) => {
     max-width: 20rem;
   }
 
+  .service__planet {
+    position: relative;
+  }
+
+  .service__art :global(picture) {
+    display: block;
+  }
+
   .service__art :global(.service__image) {
     display: block;
-    width: 100%;
+    /* 94 % so that, turned up to 3.4 degrees, it never sticks out of the art. */
+    width: 94%;
+    margin-inline: auto;
     height: auto;
+  }
+
+  /* Life of the planets (spec 005, RF-10 to RF-12). Each planet has its own
+     numbers, so no two move in step. */
+  .service[data-planet="hexaweb"] {
+    --halo: var(--color-planet-hexaweb-glow);
+    --tilt: -16deg;
+    --float-px: 10px;
+    --float-s: 8s;
+    --float-delay: -1s;
+    --turn-deg: 3deg;
+    --turn-s: 18s;
+    --turn-delay: -4s;
+    --halo-s: 5s;
+    --halo-delay: -1.5s;
+    --moon-s: 14s;
+    --moon-delay: -3s;
+  }
+
+  .service[data-planet="rankia"] {
+    --halo: var(--color-planet-rankia-glow);
+    --tilt: 14deg;
+    --float-px: 12px;
+    --float-s: 7s;
+    --float-delay: -3.5s;
+    --turn-deg: 2.6deg;
+    --turn-s: 22s;
+    --turn-delay: -11s;
+    --halo-s: 4.4s;
+    --halo-delay: -2s;
+    --moon-s: 16s;
+    --moon-delay: -2s;
+    --moon-s-2: 19s;
+    --moon-delay-2: -11s;
+  }
+
+  .service[data-planet="adara"] {
+    --halo: var(--color-planet-adara-glow);
+    --tilt: -10deg;
+    --float-px: 8px;
+    --float-s: 9.5s;
+    --float-delay: -6s;
+    --turn-deg: 3.4deg;
+    --turn-s: 15s;
+    --turn-delay: -8s;
+    --halo-s: 5.6s;
+    --halo-delay: -0.5s;
+    --moon-s: 11s;
+    --moon-delay: -5s;
+  }
+
+  /* The halo lives inside the box of the art, behind the planet. */
+  .service__halo {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(
+      circle closest-side,
+      color-mix(in srgb, var(--halo) 55%, transparent) 0%,
+      color-mix(in srgb, var(--halo) 18%, transparent) 60%,
+      transparent 100%
+    );
+  }
+
+  /* A flat ellipse around the planet, tilted. 90 % wide, so that turned it
+     stays inside the art; the moons ride it inside its own box. */
+  .service__orbit {
+    position: absolute;
+    top: 34%;
+    left: 5%;
+    width: 90%;
+    height: 32%;
+    pointer-events: none;
+    transform: rotate(var(--tilt));
+  }
+
+  .service__orbit svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .service__orbit ellipse {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-text) 45%, transparent);
+    stroke-width: 1;
+    stroke-dasharray: 3 5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .service__moon {
+    position: absolute;
+    width: 7.8%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 35% 35%,
+      var(--color-text),
+      var(--color-accent-green) 60%,
+      var(--color-button-hover)
+    );
+    /* Still pose (reduced motion, or before the animation applies): each moon
+       stands at its own point of the ellipse below, centred on it (margins in
+       % are of the orbit's width, like the moon's size). The motion path is
+       not used here: Chromium does not resolve an ellipse in % until a later
+       style change, and left every moon on the corner of the orbit's box. */
+    left: var(--moon-x);
+    top: var(--moon-y);
+    margin: -3.9% 0 0 -3.9%;
+    /* Points of ellipse(46% 37%) at 30 and 210 degrees: front right, and the
+       opposite side for the second moon of Rankia. */
+    --moon-x: 89.84%;
+    --moon-y: 68.5%;
+  }
+
+  .service__moon:nth-of-type(2) {
+    --moon-x: 10.16%;
+    --moon-y: 31.5%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* 46 % and 37 % leave room for the moon inside the box of the orbit. The
+       motion path keeps the moon on the ellipse whatever its left and top. */
+    .service__moon {
+      offset-path: ellipse(46% 37% at 50% 50%);
+      offset-rotate: 0deg;
+      offset-distance: 0%;
+    }
+
+    /* Its own point when it is not animated; the keyframes start at 0 %, so
+       it still runs the whole orbit. */
+    .service__moon:nth-of-type(2) {
+      offset-distance: 50%;
+    }
+
+    .service__art :global(picture) {
+      animation: service-float var(--float-s) ease-in-out var(--float-delay)
+        infinite;
+    }
+
+    .service__art :global(.service__image) {
+      animation: service-turn var(--turn-s) ease-in-out var(--turn-delay)
+        infinite;
+    }
+
+    .service__halo {
+      animation: planet-halo-pulse var(--halo-s) ease-in-out var(--halo-delay)
+        infinite;
+    }
+
+    .service__moon {
+      animation: planet-moon var(--moon-s) linear var(--moon-delay) infinite;
+    }
+
+    .service__moon:nth-of-type(2) {
+      animation-duration: var(--moon-s-2);
+      animation-delay: var(--moon-delay-2);
+    }
+
+    @keyframes service-float {
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(calc(var(--float-px) * -1));
+      }
+    }
+
+    @keyframes service-turn {
+      0%,
+      100% {
+        transform: rotate(calc(var(--turn-deg) * -1));
+      }
+
+      50% {
+        transform: rotate(var(--turn-deg));
+      }
+    }
+
+    @keyframes planet-halo-pulse {
+      0%,
+      100% {
+        opacity: 0.6;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    @keyframes planet-moon {
+      from {
+        offset-distance: 0%;
+      }
+
+      to {
+        offset-distance: 100%;
+      }
+    }
   }
 
   .service__tag {

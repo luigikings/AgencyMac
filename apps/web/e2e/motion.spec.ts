@@ -14,6 +14,9 @@ const READY = 'html[data-motion="on"]';
 const GSAP_HEADER = /GreenSock/;
 const GSAP_LICENSE_URL = "https://gsap.com/standard-license";
 const FOLD_MARGIN = 120;
+// Strings only ScrollTrigger's code carries (they survive minification).
+const SCROLL_TRIGGER =
+  /pin-spacer|scrollerProxy|registerPlugin\(ScrollTrigger\)/;
 
 type Loaded = { url: string; body: Buffer; startTime: number };
 
@@ -408,6 +411,48 @@ for (const { path, locale } of homePages) {
       }
     });
 
+    // Spec 005, T16b: a resize or a rotation while the traveller is still
+    // flying must not let that flight end on the old layout.
+    for (const [start, end] of [
+      [
+        { width: 667, height: 375 },
+        { width: 375, height: 667 },
+      ],
+      [
+        { width: 900, height: 700 },
+        { width: 1280, height: 720 },
+      ],
+    ] as const) {
+      test(`a resize from ${start.width} to ${end.width} px mid-flight still settles the traveller`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(start);
+        await page.goto(path);
+        await page.waitForSelector(READY, { timeout: 10_000 });
+        await page
+          .locator("[data-reveal]")
+          .nth(0)
+          .evaluate((el) => el.scrollIntoView({ block: "center" }));
+        await expectActivePlanet(page, 0);
+
+        // The flight to the next planet starts, and the layout changes.
+        await page
+          .locator("[data-reveal]")
+          .nth(1)
+          .evaluate((el) => el.scrollIntoView({ block: "center" }));
+        await expect(page.locator("#services")).toHaveAttribute(
+          "data-active-planet",
+          SERVICES[1]!.id,
+        );
+        await page.setViewportSize(end);
+        await page
+          .locator("[data-reveal]")
+          .nth(1)
+          .evaluate((el) => el.scrollIntoView({ block: "center" }));
+        await expectActivePlanet(page, 1);
+      });
+    }
+
     test("crossing the breakpoint or reducing motion never moves the visitor", async ({
       page,
     }) => {
@@ -450,6 +495,52 @@ for (const { path, locale } of homePages) {
       await page.waitForSelector(READY, { timeout: 10_000 });
       await expect(page.locator("section#contact")).toBeInViewport();
       // The blocks above the contact section were never hidden.
+      await expectAllVisible(page);
+    });
+
+    // Spec 005, D19: the layer works without ScrollTrigger, whose own frame
+    // loop never sleeps (RF-39).
+    test("no loaded script contains ScrollTrigger", async ({ page }) => {
+      const tracker = trackScripts(page);
+      await page.goto(path);
+      await page.waitForSelector(READY, { timeout: 10_000 });
+      await page.waitForSelector('html[data-fx="on"]', { timeout: 10_000 });
+      await expect(page.locator("html.lenis")).toHaveCount(1, {
+        timeout: 10_000,
+      });
+      const { loaded } = await tracker.scripts();
+      expect(loaded.length).toBeGreaterThan(0);
+      for (const script of loaded) {
+        expect(script.body.toString(), script.url).not.toMatch(SCROLL_TRIGGER);
+      }
+    });
+
+    // Spec 005, D19: a jump that goes past a hidden block (no intersection
+    // ever happens) must still leave it visible.
+    test("a jump through an anchor past hidden blocks leaves them visible", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 600 });
+      await page.goto(path);
+      await page.waitForSelector(READY, { timeout: 10_000 });
+      const before = await revealState(page);
+      expect(before.some((b) => b.art.opacity === 0)).toBe(true);
+      // An instant jump straight to the last section.
+      await page.evaluate(() => {
+        window.location.hash = "#contact";
+      });
+      await expect(page.locator("section#contact")).toBeInViewport();
+      await expect
+        .poll(async () =>
+          (await revealState(page)).every(
+            (b) =>
+              b.art.opacity === 1 &&
+              b.text.opacity === 1 &&
+              b.art.x === 0 &&
+              b.text.x === 0,
+          ),
+        )
+        .toBe(true);
       await expectAllVisible(page);
     });
 
@@ -572,7 +663,7 @@ for (const { path, locale } of homePages) {
               // Decorations (spec 005): the sky twinkles between 0.55 and 1 (RF-3) and
               // the flame of Mac fades in and out during the entrance (RF-18).
               !el.closest(
-                ".sky, .hero__flame, .hero__aura, .hero__orbit, .hero__sparkle, .hero__spark",
+                ".sky, .hero__flame, .hero__aura, .hero__orbit, .hero__sparkle, .hero__spark, .service__halo",
               ),
           )
           .map((el) => {

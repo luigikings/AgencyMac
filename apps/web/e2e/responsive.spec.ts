@@ -30,6 +30,9 @@ for (const viewport of VIEWPORTS) {
       }) => {
         await page.goto(path);
         await page.evaluate(() => document.fonts.ready);
+        // The entrance of the hero moves things for 2 s (spec 005): measure
+        // once it has settled.
+        await page.waitForTimeout(2300);
         const cut = await page.evaluate(() =>
           [...document.querySelectorAll("main *, header *, footer *")]
             .filter(

@@ -2,6 +2,8 @@
 // section 5). Pure data: no DOM, no GSAP, no date. Every limit of the device
 // tiers (RF-37) lives in TIER_PARAMS; the rest of the effects read from here.
 
+import type { ColorName } from "../../styles/tokens";
+
 /** Device classes, from no effects at all to the full set. */
 export const FX_TIERS = ["off", "low", "mid", "high"] as const;
 
@@ -104,6 +106,39 @@ export const TIER_PARAMS: Readonly<Record<FxTier, TierParams>> = {
 export const POINTER_PARALLAX_MAX_PX = 14;
 
 /**
+ * Depth of each planet for the cursor parallax (RF-13): the nearer it feels,
+ * the more it moves (1 = the full POINTER_PARALLAX_MAX_PX). Different for each
+ * planet so they never move in step.
+ */
+export const PLANET_POINTER_DEPTH: Readonly<
+  Record<"hexaweb" | "rankia" | "adara", number>
+> = {
+  hexaweb: 1,
+  rankia: 0.7,
+  adara: 0.85,
+};
+
+// Planet under the cursor (RF-14).
+/** Size of a planet under the cursor: 5 % bigger at most. */
+export const PLANET_HOVER_SCALE = 1.05;
+/** Time constant of its growth and of its return to its size, in ms. */
+export const PLANET_GROW_TAU_MS = 90;
+/** Brand colours of the sparks (token names: the canvas reads their value). */
+export const SPARK_TONES: readonly ColorName[] = [
+  "buttonHover",
+  "button",
+  "logoGradient1",
+  "logoGradient2",
+  "text",
+];
+/** [min, max] speed of a spark when it leaves the rim, in px per ms. */
+export const SPARK_SPEED_PX_MS = [0.03, 0.11] as const;
+/** The sparks start on a circle of this fraction of the planet's width. */
+export const SPARK_RIM_RATIO = 0.42;
+/** Time to reach the tier's spark limit from none while hovering, in ms. */
+export const SPARK_FILL_MS = 400;
+
+/**
  * Time constant of the return to rest after the cursor leaves, in ms. With
  * 180 ms the offset is under 1 % after 1 s (RF-13: back in under 1 s).
  */
@@ -116,6 +151,21 @@ export const DEGRADE_LIMIT_MS = 12;
 
 /** A shooting star lasts between these two durations, in ms (RF-4). */
 export const SHOOTING_STAR_MS = [600, 1200] as const;
+/** Fall of a shooting star below the horizontal, in degrees. */
+export const SHOOTING_STAR_ANGLE_DEG = [15, 35] as const;
+/** Length of its tail and of its whole run, in CSS px. */
+export const SHOOTING_STAR_TAIL_PX = [80, 160] as const;
+export const SHOOTING_STAR_TRAVEL_PX = [280, 520] as const;
+/** Width of its head and its tail, in CSS px. */
+export const SHOOTING_STAR_WIDTH_PX = 1.6;
+
+// Effects canvas (RF-39, RNF-8).
+/** Largest internal resolution of the canvas, in device pixels. */
+export const MAX_CANVAS_PIXELS = 2_000_000;
+/** Wait after the last resize before the canvas is sized again, in ms. */
+export const CANVAS_RESIZE_DEBOUNCE_MS = 150;
+/** Frame costs kept for the report and the degradation (the latest ones). */
+export const FRAME_COST_SAMPLES = 600;
 
 export type ParticleKind = "trail" | "burst" | "spark" | "cursor";
 

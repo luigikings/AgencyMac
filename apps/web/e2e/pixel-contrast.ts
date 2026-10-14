@@ -70,8 +70,14 @@ export async function textContrastByPixels(
   let screenshot: Buffer;
   try {
     // One frame so the hidden text is gone before the capture.
+    // (Some pages run without scripts and, in a hidden or throttled page,
+    // requestAnimationFrame may never fire: do not wait for it for ever.)
     await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(resolve);
+          setTimeout(resolve, 100);
+        }),
     );
     screenshot = await page.screenshot({ clip: info.box });
   } finally {

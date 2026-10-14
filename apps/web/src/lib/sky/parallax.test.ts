@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { easeToRest, pointerParallax, scrollParallax } from "./parallax";
+import {
+  easeToRest,
+  limitLength,
+  pointerParallax,
+  scrollParallax,
+} from "./parallax";
 
 describe("scrollParallax (RF-2)", () => {
   it("is centred: -range/2 at the top, 0 in the middle, +range/2 at the end", () => {
@@ -92,5 +97,22 @@ describe("easeToRest (return in under 1 s, RF-13)", () => {
     let sliced = { x: 10, y: 0 };
     for (let i = 0; i < 4; i++) sliced = easeToRest(sliced, 100);
     expect(sliced.x).toBeCloseTo(once.x, 10);
+  });
+});
+
+describe("limitLength (RF-13: a planet moves at most 14 px)", () => {
+  it("keeps a short offset as it is", () => {
+    expect(limitLength({ x: 3, y: -4 }, 14)).toEqual({ x: 3, y: -4 });
+  });
+
+  it("shortens a diagonal to the limit, keeping its direction", () => {
+    const p = limitLength({ x: 14, y: 14 }, 14);
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(14, 10);
+    expect(p.x).toBeCloseTo(p.y, 10);
+  });
+
+  it("returns 0 for a non-positive limit or a zero offset", () => {
+    expect(limitLength({ x: 5, y: 5 }, 0)).toEqual({ x: 0, y: 0 });
+    expect(limitLength({ x: 0, y: 0 }, 14)).toEqual({ x: 0, y: 0 });
   });
 });

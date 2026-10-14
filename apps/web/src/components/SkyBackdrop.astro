@@ -14,6 +14,7 @@ import { STAR_LAYERS } from "../lib/sky/star-field";
       data-star-layer={layer.id}
       data-star-count={layer.desktopCount}
       data-star-count-narrow={layer.mobileCount}
+      data-parallax-vh={layer.parallaxVh}
     />
   ))}
 </div>
@@ -32,6 +33,24 @@ import { STAR_LAYERS } from "../lib/sky/star-field";
     pointer-events: none;
   }
 
+  /* RF-15: the effects layer marks the blocks that are out of the window
+     with data-offscreen; everything animated inside them stands still until
+     they come back. !important: the component styles set the play state
+     through the animation shorthand. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-offscreen],
+    [data-offscreen] *,
+    [data-offscreen] *::before,
+    [data-offscreen] *::after,
+    /* RF-39: with the tab hidden the effects layer sets data-fx-paused and
+       every decoration of the page stands still. */
+    html[data-fx-paused] *,
+    html[data-fx-paused] *::before,
+    html[data-fx-paused] *::after {
+      animation-play-state: paused !important;
+    }
+  }
+
   body[data-sky]
     :is(
       .site-header,
@@ -45,5 +64,11 @@ import { STAR_LAYERS } from "../lib/sky/star-field";
     ) {
     position: relative;
     z-index: 1;
+  }
+
+  /* Plan section 3: the effects canvas (z-index 5) goes over the content
+     and under the header. */
+  body[data-sky] .site-header {
+    z-index: 6;
   }
 </style>

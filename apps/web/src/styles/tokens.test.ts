@@ -9,6 +9,7 @@ import {
   fontPreloads,
   fonts,
   tokensToCss,
+  type FontVariant,
 } from "./tokens";
 
 const WEB_ROOT = new URL("../../", import.meta.url);
@@ -129,15 +130,16 @@ describe("fonts (RF-18)", () => {
     }
   });
 
-  it.each(Object.values(fonts).flatMap((token) => token.variants))(
-    "$file is a woff2 stored in the repo",
-    ({ file }) => {
-      expect(file).toMatch(/^[a-z0-9-]+\.woff2$/);
-      const path = webFile(FONTS_DIR + file);
-      expect(existsSync(path), path).toBe(true);
-      expect(readFileSync(path).subarray(0, 4).toString("latin1")).toBe("wOF2");
-    },
-  );
+  it.each(
+    Object.values(fonts).flatMap(
+      (token): readonly FontVariant[] => token.variants,
+    ),
+  )("$file is a woff2 stored in the repo", ({ file }) => {
+    expect(file).toMatch(/^[a-z0-9-]+\.woff2$/);
+    const path = webFile(FONTS_DIR + file);
+    expect(existsSync(path), path).toBe(true);
+    expect(readFileSync(path).subarray(0, 4).toString("latin1")).toBe("wOF2");
+  });
 
   it("preloads only Lilita One 400 and Lato 400 (plan, D8)", () => {
     expect(fontPreloads(fonts.heading)).toEqual([

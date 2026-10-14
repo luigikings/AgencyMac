@@ -49,3 +49,15 @@ export function easeToRest(current: Point, dtMs: number): Point {
   const k = Math.exp(-Math.max(0, dtMs) / POINTER_REST_TAU_MS);
   return { x: current.x * k, y: current.y * k };
 }
+
+/**
+ * Shortens an offset to at most `maxPx` (keeping its direction), so a planet
+ * at a corner of the cursor box still moves no more than the limit (RF-13).
+ */
+export function limitLength(p: Point, maxPx: number): Point {
+  if (maxPx <= 0) return { x: 0, y: 0 };
+  const length = Math.hypot(p.x, p.y);
+  if (length <= maxPx) return { x: p.x, y: p.y };
+  const k = maxPx / length;
+  return { x: p.x * k, y: p.y * k };
+}

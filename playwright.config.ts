@@ -4,6 +4,9 @@ const isCI = !!process.env.CI;
 // Spec 003 (RF-11, P7): the CI builds once and sets PREBUILT_DIST=1 so the
 // web servers only serve that build. Locally (no variable) they build first.
 const prebuilt = process.env.PREBUILT_DIST === "1";
+// Titles of the tests that measure time (interaction latency and the frame
+// cost of the effects), which get a project of their own.
+const INTERACTION_LATENCY = /interaction latency|frame cost/;
 const serve = (app: string) =>
   prebuilt
     ? `pnpm --filter ${app} preview`
@@ -24,12 +27,26 @@ export default defineConfig({
     {
       name: "web",
       testDir: "apps/web/e2e",
+      grepInvert: INTERACTION_LATENCY,
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4322" },
     },
     {
       name: "control",
       testDir: "apps/control/e2e",
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4173" },
+    },
+    // The interaction latency proxy (budget.spec.ts, RNF-4) measures until
+    // the next frame is shown. Headless Chromium composites in software, so
+    // with the other workers running the frames of the page wait for CPU and
+    // the measure includes that wait (spec 005, note under T15). It runs
+    // alone, after the rest, with the same 200 ms limit. The frame cost of
+    // the effects (fx.spec.ts, plan section 8) is measured here too.
+    {
+      name: "web-latency",
+      testDir: "apps/web/e2e",
+      grep: INTERACTION_LATENCY,
+      dependencies: ["web", "control"],
+      use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4322" },
     },
   ],
   webServer: [

@@ -1,5 +1,6 @@
 // Single source of the timing and position constants of the home page
-// animation (spec 004, plan D13b). Pure data: no DOM, no GSAP.
+// animation (spec 004, plan D13b; without ScrollTrigger since spec 005, D19).
+// Pure data: no DOM, no GSAP.
 
 // Wait this long after the window `load` event before downloading the
 // animation code, so it never competes with the first paint (RNF-4).
@@ -25,10 +26,23 @@ export const TRAVELER_PLANET_ANCHOR = {
 } as const;
 
 // Reveal of the service blocks (RF-35): how far the halves travel, how long
-// they take and where in the window the block triggers (ScrollTrigger start).
+// they take and where in the window the block starts: when its top edge
+// reaches this fraction of the window height (0.8 = 80 % down). Spec 005, D19:
+// an IntersectionObserver and the single scroll handler watch that line; there
+// is no ScrollTrigger.
 export const REVEAL_OFFSET_PX = 64;
 export const REVEAL_DURATION_S = 0.8;
-export const REVEAL_START = "top 80%";
+export const REVEAL_START_RATIO = 0.8;
+
+// Smooth scrolling runs its own frame loop only while the page moves, and
+// stops after this many frames in a row without movement (spec 005, RF-39,
+// plan 14.2).
+export const SMOOTH_IDLE_FRAMES = 3;
+
+// GSAP's ticker only runs while a tween plays: every this many frames it checks
+// whether any is left and sleeps if not (GSAP's `autoSleep`, 120 by default).
+// 60 puts it to sleep about a second after the last tween (RF-39, plan 14.2).
+export const GSAP_AUTO_SLEEP_FRAMES = 60;
 
 // Two-column layout from this width (matches the CSS breakpoint of the
 // service blocks).

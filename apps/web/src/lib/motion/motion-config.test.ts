@@ -5,11 +5,13 @@ import {
   FINE_POINTER_QUERY,
   FOLD_MARGIN_PX,
   GESTURE_MS,
+  GSAP_AUTO_SLEEP_FRAMES,
   LOAD_DELAY_MS,
   MARKER_RATIO,
   REVEAL_DURATION_S,
   REVEAL_OFFSET_PX,
-  REVEAL_START,
+  REVEAL_START_RATIO,
+  SMOOTH_IDLE_FRAMES,
   TRAVELER_MIN_PX,
   TRAVELER_MOVE_S,
   TRAVELER_PLANET_ANCHOR,
@@ -29,12 +31,30 @@ describe("motion-config", () => {
   it("defines the reveal of the service blocks", () => {
     expect(REVEAL_OFFSET_PX).toBeGreaterThan(0);
     expect(REVEAL_DURATION_S).toBeGreaterThan(0);
-    expect(REVEAL_START).toMatch(/^top \d+%$/);
+    // Spec 005, D19: the start line is a fraction of the window height (the
+    // former ScrollTrigger syntax "top 80%" is gone).
+    expect(REVEAL_START_RATIO).toBeGreaterThan(0);
+    expect(REVEAL_START_RATIO).toBeLessThanOrEqual(1);
     expect(WIDE_QUERY).toBe("(min-width: 48rem)");
   });
 
   it("limits smooth scrolling to a fine pointer", () => {
     expect(FINE_POINTER_QUERY).toBe("(hover: hover) and (pointer: fine)");
+  });
+
+  it("stops the smooth scrolling loop after a few still frames", () => {
+    expect(Number.isInteger(SMOOTH_IDLE_FRAMES)).toBe(true);
+    expect(SMOOTH_IDLE_FRAMES).toBeGreaterThanOrEqual(1);
+  });
+
+  // RF-39: GSAP's ticker checks every GSAP_AUTO_SLEEP_FRAMES frames whether a
+  // tween is left and sleeps if not: asleep at most 1 s after the last tween at
+  // 60 frames per second (2 s at 30), inside the 2.5 s of the rest test even
+  // when frames come slower. GSAP's default (120) could take 4 s.
+  it("lets GSAP's ticker sleep about a second after the last tween", () => {
+    expect(Number.isInteger(GSAP_AUTO_SLEEP_FRAMES)).toBe(true);
+    expect(GSAP_AUTO_SLEEP_FRAMES).toBeGreaterThanOrEqual(1);
+    expect(GSAP_AUTO_SLEEP_FRAMES).toBeLessThanOrEqual(60);
   });
 
   it("sizes and times the travelling Mac", () => {
@@ -58,11 +78,12 @@ describe("motion modules are pure", () => {
     (f) => f.endsWith(".ts") && !f.endsWith(".test.ts"),
   );
 
-  it("finds the four modules", () => {
+  it("finds the five modules", () => {
     expect(sources.sort()).toEqual([
       "active-stop.ts",
       "motion-config.ts",
       "reveal-plan.ts",
+      "smooth-loop.ts",
       "traveler.ts",
     ]);
   });

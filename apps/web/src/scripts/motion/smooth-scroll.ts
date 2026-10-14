@@ -3,14 +3,17 @@ import Lenis from "lenis";
 // while smooth scrolling runs: never in the base stylesheet (`?inline` keeps
 // the bundler from putting them into the page's CSS).
 import lenisCss from "lenis/dist/lenis.css?inline";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SMOOTH_IDLE_FRAMES } from "../../lib/motion/motion-config";
+import { keepTicking, nextIdleFrames } from "../../lib/motion/smooth-loop";
 
 // Smooth scrolling (RF-37, plan D16). Only loaded for a fine pointer without
 // reduced motion. Scrolling stays native (the keyboard, the browser's search
 // and assistive technology keep working); Lenis only smooths the wheel and
-// anchor jumps. It is driven by GSAP's ticker so ScrollTrigger and the
-// travelling Mac see the same scroll position. Returns the cleanup function.
+// anchor jumps. The window scrolls natively, so the core's scroll handler sees
+// every position. Spec 005, D19 (plan 14.2): Lenis has a frame loop of its own
+// that only runs while the page moves and stops after SMOOTH_IDLE_FRAMES still
+// frames, so at rest no frame is requested (RF-39). Nothing is hooked to GSAP's
+// ticker. Returns the cleanup function.
 export function startSmoothScroll(): () => void {
   const style = document.createElement("style");
   style.setAttribute("data-lenis-css", "");
@@ -18,12 +21,56 @@ export function startSmoothScroll(): () => void {
   document.head.append(style);
 
   const lenis = new Lenis({ autoRaf: false, anchors: true });
-  lenis.on("scroll", ScrollTrigger.update);
-  const tick = (time: number) => lenis.raf(time * 1000);
-  gsap.ticker.add(tick);
-  gsap.ticker.lagSmoothing(0);
+  let frame = 0;
+  let idle = 0;
+  // Lenis measures each step from the previous time it got: after a pause the
+  // gap would make it jump to the end. Its clock only advances while the loop
+  // runs (the first frame after waking adds no time).
+  let clock = 0;
+  let last = -1;
+
+  const loop = (time: number) => {
+    clock += last < 0 ? 0 : time - last;
+    last = time;
+    lenis.raf(clock);
+    idle = nextIdleFrames(idle, lenis.isScrolling !== false);
+    if (keepTicking(idle, SMOOTH_IDLE_FRAMES)) {
+      frame = window.requestAnimationFrame(loop);
+    } else {
+      frame = 0;
+      last = -1;
+    }
+  };
+  const halt = () => {
+    if (frame) window.cancelAnimationFrame(frame);
+    frame = 0;
+    last = -1;
+  };
+  const wake = () => {
+    idle = 0;
+    if (!frame && !document.hidden) {
+      frame = window.requestAnimationFrame(loop);
+    }
+  };
+  const onVisibility = () => {
+    if (document.hidden) halt();
+    else if (lenis.isScrolling !== false) wake();
+  };
+
+  // Anything that may start a movement wakes the loop: the wheel, a click on
+  // an anchor (Lenis scrolls to it), the keyboard and any other scroll.
+  window.addEventListener("wheel", wake, { passive: true });
+  window.addEventListener("click", wake, { capture: true });
+  window.addEventListener("keydown", wake);
+  window.addEventListener("scroll", wake, { passive: true });
+  document.addEventListener("visibilitychange", onVisibility);
   return () => {
-    gsap.ticker.remove(tick);
+    window.removeEventListener("wheel", wake);
+    window.removeEventListener("click", wake, { capture: true });
+    window.removeEventListener("keydown", wake);
+    window.removeEventListener("scroll", wake);
+    document.removeEventListener("visibilitychange", onVisibility);
+    halt();
     lenis.destroy();
     style.remove();
   };
