@@ -4,7 +4,11 @@ import Lenis from "lenis";
 // the bundler from putting them into the page's CSS).
 import lenisCss from "lenis/dist/lenis.css?inline";
 import { SMOOTH_IDLE_FRAMES } from "../../lib/motion/motion-config";
-import { keepTicking, nextIdleFrames } from "../../lib/motion/smooth-loop";
+import {
+  keepTicking,
+  needsResync,
+  nextIdleFrames,
+} from "../../lib/motion/smooth-loop";
 
 // Smooth scrolling (RF-37, plan D16). Only loaded for a fine pointer without
 // reduced motion. Scrolling stays native (the keyboard, the browser's search
@@ -52,6 +56,18 @@ export function startSmoothScroll(): () => void {
       frame = window.requestAnimationFrame(loop);
     }
   };
+  // Runs in the capture phase, before Lenis' own click handler (bubble): a
+  // scroll whose event has not arrived yet would otherwise make Lenis aim at
+  // an anchor from an old position and jump back there first (note under T18
+  // of spec 005). Lenis' public fields are enough: no animation is running.
+  const onClick = () => {
+    if (
+      needsResync(lenis.isScrolling, lenis.animatedScroll, lenis.actualScroll)
+    ) {
+      lenis.animatedScroll = lenis.targetScroll = lenis.actualScroll;
+    }
+    wake();
+  };
   const onVisibility = () => {
     if (document.hidden) halt();
     else if (lenis.isScrolling !== false) wake();
@@ -60,13 +76,13 @@ export function startSmoothScroll(): () => void {
   // Anything that may start a movement wakes the loop: the wheel, a click on
   // an anchor (Lenis scrolls to it), the keyboard and any other scroll.
   window.addEventListener("wheel", wake, { passive: true });
-  window.addEventListener("click", wake, { capture: true });
+  window.addEventListener("click", onClick, { capture: true });
   window.addEventListener("keydown", wake);
   window.addEventListener("scroll", wake, { passive: true });
   document.addEventListener("visibilitychange", onVisibility);
   return () => {
     window.removeEventListener("wheel", wake);
-    window.removeEventListener("click", wake, { capture: true });
+    window.removeEventListener("click", onClick, { capture: true });
     window.removeEventListener("keydown", wake);
     window.removeEventListener("scroll", wake);
     document.removeEventListener("visibilitychange", onVisibility);

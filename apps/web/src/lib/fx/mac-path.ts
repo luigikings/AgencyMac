@@ -9,6 +9,7 @@ import {
   MAC_FLIGHT_MS_PER_PX,
   MAC_MAX_TILT_DEG,
   MAC_MIN_BEND_PX,
+  MAC_TILT_BLEND,
 } from "./fx-config";
 
 export type Point = { x: number; y: number };
@@ -112,4 +113,35 @@ export function maxDeviation(c: Curve): number {
  */
 export function retarget(current: Point, to: Point, side: 1 | -1): Curve {
   return curveBetween(current, to, side);
+}
+
+/**
+ * Side a flight from `from` to `to` bends to (spec 005, T19). A mostly
+ * vertical flight (from planet to planet down or up the page) bends towards
+ * the horizontal centre of its container `centreX`, so Mac stays on screen
+ * even at 320 px; a mostly horizontal one hops upwards.
+ */
+export function bendSide(from: Point, to: Point, centreX: number): 1 | -1 {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    // x of the normal for side 1 is -dy / d: its sign must match the centre's.
+    const towards = centreX - (from.x + to.x) / 2;
+    return -dy * towards < 0 ? -1 : 1;
+  }
+  // y of the normal for side 1 is dx / d: up (negative y) when dx < 0.
+  return dx > 0 ? -1 : 1;
+}
+
+/**
+ * Tilt of Mac at progress t of a flight along `c` (RF-22) that started with
+ * tilt `startTilt`: over the first MAC_TILT_BLEND of the flight it moves
+ * smoothly from that tilt to the one of the direction of travel.
+ */
+export function flightTilt(c: Curve, t: number, startTilt: number): number {
+  const target = tiltFor(angleAt(c, t));
+  const k = Math.min(1, Math.max(0, t / MAC_TILT_BLEND));
+  const blend = k * k * (3 - 2 * k);
+  const tilt = startTilt + (target - startTilt) * blend;
+  return Math.max(-MAC_MAX_TILT_DEG, Math.min(MAC_MAX_TILT_DEG, tilt));
 }

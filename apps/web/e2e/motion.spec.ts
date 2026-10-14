@@ -1,8 +1,8 @@
 import { gzipSync } from "node:zlib";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { t } from "../src/lib/i18n";
 import { GESTURE_MS, LOAD_DELAY_MS } from "../src/lib/motion/motion-config";
-import { SERVICES } from "../src/lib/site-data";
+import { NAV_SECTIONS, SERVICES } from "../src/lib/site-data";
 import { homePages } from "./pages";
 
 // RF-31, RF-32, RF-33, RF-35, RNF-5, RNF-7: the animation code arrives late
@@ -711,34 +711,90 @@ for (const { path, locale } of homePages) {
       }
     });
 
-    test("links to sections arrive at their section", async ({ page }) => {
+    test("the header links to every section", async ({ page }) => {
+      await page.goto(path);
+      const hrefs = await page
+        .locator('header nav a[href^="#"]')
+        .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+      expect(hrefs.length).toBeGreaterThanOrEqual(4);
+      expect(hrefs).toEqual(NAV_SECTIONS.map((s) => `#${s.id}`));
+    });
+
+    // One test per link, each with its own time budget: as a single test the
+    // six round trips took 18 s of its 30 s alone and up to 29.5 s with
+    // 8 workers (note under T18 of spec 005). Each one checks where the page
+    // comes to rest: the browser's own jump to the anchor passes by the
+    // section for a moment before Lenis moves.
+    const anchorLinks: {
+      name: string;
+      id: string;
+      link: (p: Page) => Locator;
+    }[] = [
+      ...NAV_SECTIONS.map((s) => ({
+        name: `the header link to #${s.id}`,
+        id: s.id,
+        link: (p: Page) => p.locator(`header nav a[href="#${s.id}"]`),
+      })),
+      // "Descubre cómo" (hero) and "Quiero despegar" (header).
+      {
+        name: "the hero's discover link",
+        id: "services",
+        link: (p: Page) => p.locator("a.hero__discover"),
+      },
+      {
+        name: "the take-off button",
+        id: "contact",
+        link: (p: Page) =>
+          p.getByRole("link", { name: t(locale, "cta.takeOff") }).first(),
+      },
+    ];
+    for (const { name, id, link } of anchorLinks) {
+      test(`${name} arrives at its section`, async ({ page }) => {
+        await page.goto(path);
+        await expect(page.locator(LENIS)).toHaveCount(1, { timeout: 12_000 });
+        await backToTop(page);
+        await link(page).click();
+        await settledScroll(page);
+        await expect
+          .poll(() => arrivedAt(page, id), { timeout: 8000 })
+          .toBe(true);
+      });
+    }
+
+    // A scroll Lenis has not heard of yet (its `scroll` event comes with the
+    // next frame) followed by a click on a link in the same frame: the
+    // browser scrolling a link into view, or a busy CPU. Lenis must start
+    // from where the page is, not from where it last saw it (the anchor test
+    // above failed in the CI that way: plan 005, note under T18).
+    test("a link clicked right after an unseen scroll still arrives", async ({
+      page,
+    }) => {
       await page.goto(path);
       await expect(page.locator(LENIS)).toHaveCount(1, { timeout: 12_000 });
-      const links = page.locator('header nav a[href^="#"]');
-      const count = await links.count();
-      expect(count).toBeGreaterThanOrEqual(4);
-      for (let i = 0; i < count; i++) {
-        const href = (await links.nth(i).getAttribute("href"))!;
-        await backToTop(page);
-        await links.nth(i).click();
-        await expect
-          .poll(() => arrivedAt(page, href.slice(1)), { timeout: 8000 })
-          .toBe(true);
-      }
-      // "Descubre cómo" (hero) and "Quiero despegar" (header).
       await backToTop(page);
-      await page.locator("a.hero__discover").click();
-      await expect
-        .poll(() => arrivedAt(page, "services"), { timeout: 8000 })
-        .toBe(true);
-      await backToTop(page);
-      await page
-        .getByRole("link", { name: t(locale, "cta.takeOff") })
-        .first()
-        .click();
-      await expect
-        .poll(() => arrivedAt(page, "contact"), { timeout: 8000 })
-        .toBe(true);
+      const start = 600;
+      await page.evaluate((y) => {
+        const w = window as unknown as { __minY: number };
+        w.__minY = Infinity;
+        window.addEventListener(
+          "scroll",
+          () => (w.__minY = Math.min(w.__minY, window.scrollY)),
+          { passive: true },
+        );
+        window.scrollTo({ top: y, behavior: "instant" });
+        document
+          .querySelector<HTMLAnchorElement>('header nav a[href="#projects"]')!
+          .click();
+      }, start);
+      // Where the page comes to rest, not a moment on the way: the browser's
+      // own jump to the anchor passes by the section before Lenis moves.
+      await settledScroll(page);
+      expect(await arrivedAt(page, "projects")).toBe(true);
+      // It never jumps back above where the page was before going down.
+      const minY = await page.evaluate(
+        () => (window as unknown as { __minY: number }).__minY,
+      );
+      expect(minY).toBeGreaterThanOrEqual(start - 1);
     });
 
     test("the keyboard scrolls: Tab, Space, arrows, Home and End", async ({

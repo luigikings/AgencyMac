@@ -2,8 +2,10 @@ import { TIER_PARAMS, type FxTier } from "../../lib/fx/fx-config";
 import { FINE_POINTER_QUERY } from "../../lib/motion/motion-config";
 import { scrollParallax } from "../../lib/sky/parallax";
 import { mulberry32 } from "../../lib/sky/rng";
+import type { Traveler } from "../motion/home-motion";
 import type { ScrollHub } from "../motion/scroll-hub";
 import { createFxCanvas, type FxCanvas } from "./canvas";
+import { macFlight } from "./mac-fx";
 import { planetFx } from "./planet-fx";
 import { shootingStars } from "./shooting-stars";
 
@@ -18,8 +20,11 @@ type Cleanup = () => void;
 /** Called when the tab becomes hidden and when it is visible again. */
 type Hooks = { onHide: Cleanup[]; onShow: Cleanup[] };
 
-/** What the animation core hands to the effects (plan 14.1). */
-export type FxCore = { hub: ScrollHub };
+/**
+ * What the animation core hands to the effects (plan 14.1 and 14.6): the
+ * single scroll handler and the travelling Mac, if there is one.
+ */
+export type FxCore = { hub: ScrollHub; traveler: Traveler | null };
 
 // RF-2: the first `count` star layers (far, middle, near) travel their range
 // over the whole page; the rest stay still. They follow the core's single
@@ -90,7 +95,7 @@ function pauseWhenHidden(hooks: Hooks): Cleanup {
 }
 
 /** Starts the effects of the tier; returns the function that removes them. */
-export function startFx(tier: FxTier, { hub }: FxCore): Cleanup {
+export function startFx(tier: FxTier, { hub, traveler }: FxCore): Cleanup {
   const root = document.documentElement;
   const params = TIER_PARAMS[tier];
   const hooks: Hooks = { onHide: [], onShow: [] };
@@ -101,6 +106,8 @@ export function startFx(tier: FxTier, { hub }: FxCore): Cleanup {
     pauseWhenHidden(hooks),
     starParallax(hub, params.scrollParallaxLayers),
   ];
+  // RF-21, RF-22: Mac flies along a curve between planets, in every class.
+  if (traveler) cleanups.push(macFlight(traveler));
   // Without 2D drawing there is no canvas, and the effects drawn on it are
   // simply left out (RF-41).
   const canvas = createFxCanvas(params.canvasDensity);

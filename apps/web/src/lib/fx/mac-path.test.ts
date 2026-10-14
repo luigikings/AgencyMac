@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   angleAt,
+  bendSide,
   curveBetween,
   flightMs,
+  flightTilt,
   maxDeviation,
   pointAt,
   retarget,
@@ -142,5 +144,116 @@ describe("retarget (RF-21: change of planet in mid-flight)", () => {
     expect(maxDeviation(second)).toBeGreaterThanOrEqual(
       0.12 * Math.hypot(to.x - here.x, to.y - here.y),
     );
+  });
+});
+
+// Spec 005, T19: the side the flight bends to, and the tilt along a flight
+// that starts from the tilt Mac already had (a change of planet mid-flight).
+describe("bendSide (RF-21)", () => {
+  // Offset of the curve from its chord at t = 0.3 (where it strays most).
+  const bulge = (
+    from: { x: number; y: number },
+    to: typeof from,
+    side: 1 | -1,
+  ) => {
+    const c = curveBetween(from, to, side);
+    const p = pointAt(c, 0.3);
+    return {
+      x: p.x - (from.x + (to.x - from.x) * 0.3),
+      y: p.y - (from.y + (to.y - from.y) * 0.3),
+    };
+  };
+
+  it("bends a vertical flight towards the centre of the container", () => {
+    for (const [fromY, toY] of [
+      [100, 900],
+      [900, 100],
+    ]) {
+      const right = { x: 300, y: fromY! };
+      const rightTo = { x: 300, y: toY! };
+      expect(
+        bulge(right, rightTo, bendSide(right, rightTo, 187)).x,
+      ).toBeLessThan(-10);
+      const left = { x: 40, y: fromY! };
+      const leftTo = { x: 40, y: toY! };
+      expect(
+        bulge(left, leftTo, bendSide(left, leftTo, 187)).x,
+      ).toBeGreaterThan(10);
+    }
+  });
+
+  it("bends a mostly vertical, slanted flight towards the centre too", () => {
+    for (const [a, b] of [
+      [
+        { x: 900, y: 100 },
+        { x: 300, y: 900 },
+      ],
+      [
+        { x: 300, y: 100 },
+        { x: 900, y: 900 },
+      ],
+      [
+        { x: 300, y: 900 },
+        { x: 900, y: 100 },
+      ],
+    ] as const) {
+      const centre = 640;
+      const mid = (a.x + b.x) / 2;
+      const off = bulge(a, b, bendSide(a, b, centre));
+      // When the middle of the flight is on one side, the curve leans to the other.
+      if (Math.abs(mid - centre) > 1)
+        expect(off.x * (centre - mid)).toBeGreaterThan(0);
+    }
+  });
+
+  it("makes a mostly horizontal flight hop upwards, in both directions", () => {
+    const a = { x: 100, y: 400 };
+    const b = { x: 700, y: 450 };
+    expect(bulge(a, b, bendSide(a, b, 400)).y).toBeLessThan(-10);
+    expect(bulge(b, a, bendSide(b, a, 400)).y).toBeLessThan(-10);
+  });
+
+  it("always returns 1 or -1, also for a flight of length 0", () => {
+    expect([1, -1]).toContain(bendSide({ x: 5, y: 5 }, { x: 5, y: 5 }, 5));
+  });
+});
+
+describe("flightTilt (RF-22)", () => {
+  const curve = curveBetween({ x: 300, y: 100 }, { x: 300, y: 900 }, 1);
+
+  it("starts exactly from the tilt Mac already had", () => {
+    for (const start of [-25, -10, 0, 12, 25]) {
+      expect(flightTilt(curve, 0, start)).toBeCloseTo(start, 9);
+    }
+  });
+
+  it("follows the direction of the flight after the blend", () => {
+    for (const t of [0.4, 0.6, 0.9, 1]) {
+      expect(flightTilt(curve, t, 20)).toBeCloseTo(
+        tiltFor(angleAt(curve, t)),
+        9,
+      );
+    }
+  });
+
+  it("stays between -25 and 25 degrees", () => {
+    for (const start of [-25, 0, 25]) {
+      for (let t = 0; t <= 1; t += 0.01) {
+        const tilt = flightTilt(curve, t, start);
+        expect(tilt).toBeGreaterThanOrEqual(-25);
+        expect(tilt).toBeLessThanOrEqual(25);
+      }
+    }
+  });
+
+  it("changes smoothly: no jump between close points of the flight", () => {
+    for (const start of [-25, 0, 25]) {
+      let last = flightTilt(curve, 0, start);
+      for (let t = 0.005; t <= 1; t += 0.005) {
+        const now = flightTilt(curve, t, start);
+        expect(Math.abs(now - last), `t ${t.toFixed(3)}`).toBeLessThan(2);
+        last = now;
+      }
+    }
   });
 });

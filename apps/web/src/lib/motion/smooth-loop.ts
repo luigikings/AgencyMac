@@ -11,3 +11,20 @@ export function nextIdleFrames(idle: number, moving: boolean): number {
 export function keepTicking(idle: number, maxIdle: number): boolean {
   return maxIdle >= 1 && idle < maxIdle;
 }
+
+/**
+ * Whether Lenis' copy of the scroll position must be brought up to date
+ * before it handles a click. Lenis only learns about a scroll it did not make
+ * from the `scroll` event, which comes with the next frame; a click on an
+ * anchor in between (the browser scrolling the link into view, a busy CPU)
+ * made it aim from the old position and jump back there first. Its own smooth
+ * scroll is left alone. Differences under half a pixel do not count.
+ */
+export function needsResync(
+  scrolling: boolean | string,
+  animated: number,
+  actual: number,
+): boolean {
+  if (scrolling === "smooth" || !Number.isFinite(actual)) return false;
+  return !Number.isFinite(animated) || Math.abs(animated - actual) > 0.5;
+}

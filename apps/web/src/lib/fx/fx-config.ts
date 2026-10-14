@@ -215,6 +215,12 @@ export const MAC_FLIGHT_MS = [700, 1600] as const;
 /** Largest tilt in flight, in degrees (RF-22), and time to straighten up. */
 export const MAC_MAX_TILT_DEG = 25;
 export const MAC_SETTLE_MS = 300;
+/**
+ * Part of a flight (0..1 of its progress) over which the tilt goes from the
+ * one Mac had to the one of the flight, so a new flight (also a change of
+ * planet mid-flight) never makes him turn at once.
+ */
+export const MAC_TILT_BLEND = 0.25;
 
 // Mac's reactions (RF-25 to RF-29).
 export const LOOK_MAX_DEG = 6;

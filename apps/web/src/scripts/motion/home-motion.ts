@@ -121,6 +121,27 @@ function revealBlocks(
 
 type Box = { left: number; top: number; width: number; height: number };
 
+/** Place of the traveller: its top-left corner, relative to #services. */
+export type TravelerPoint = { x: number; y: number };
+
+/**
+ * A flight that replaces the straight move of spec 004 (spec 005, T19: the
+ * curve of the effects module).
+ */
+export type TravelerFlight = {
+  /** Flies from wherever Mac is now to `to`. */
+  fly(to: TravelerPoint): void;
+  /** Ends a flight at once (Mac is then placed with no animation). */
+  stop(): void;
+};
+
+/** What the core hands to the effects about the travelling Mac (plan 14.6). */
+export type Traveler = {
+  img: HTMLImageElement;
+  /** Moves with `flight` until the function it returns is called. */
+  useFlight(flight: TravelerFlight): () => void;
+};
+
 // Box of an element as laid out, ignoring the reveal's own translation (a
 // block that is still sliding in would otherwise move the target).
 function layoutBox(el: HTMLElement, moved: HTMLElement): Box {
@@ -138,12 +159,19 @@ function layoutBox(el: HTMLElement, moved: HTMLElement): Box {
 // The travelling Mac (RF-34, plan D15): created here, not in the HTML, so
 // without JavaScript there is no duplicate image. Decorative: empty alt,
 // hidden from assistive technology, absolutely positioned (no layout shift).
-// Returns the cleanup function.
-function travelingMac(hub: ScrollHub): () => void {
+// It moves straight to each new planet; the effects module may replace that
+// move with its curved flight (spec 005, T19). Returns the cleanup function
+// and the handle for the effects (none when there is no traveller).
+function travelingMac(hub: ScrollHub): {
+  stop: () => void;
+  traveler: Traveler | null;
+} {
   const services = document.getElementById("services");
   const heroMac = document.querySelector<HTMLImageElement>(".hero__mac");
   const blocks = gsap.utils.toArray<HTMLElement>("#services [data-reveal]");
-  if (!services || !heroMac || blocks.length === 0) return () => {};
+  if (!services || !heroMac || blocks.length === 0) {
+    return { stop: () => {}, traveler: null };
+  }
 
   const img = document.createElement("img");
   img.src = heroMac.currentSrc || heroMac.src;
@@ -170,6 +198,7 @@ function travelingMac(hub: ScrollHub): () => void {
     block,
   }));
   let active = -1;
+  let flight: TravelerFlight | undefined;
 
   const targetFor = (index: number) => {
     const part = parts[index]!;
@@ -190,6 +219,11 @@ function travelingMac(hub: ScrollHub): () => void {
 
   const place = (index: number, animate: boolean) => {
     const { x, y } = targetFor(index);
+    if (animate && flight) {
+      flight.fly({ x, y });
+      return;
+    }
+    flight?.stop();
     if (animate) {
       gsap.to(img, {
         x,
@@ -234,12 +268,27 @@ function travelingMac(hub: ScrollHub): () => void {
     update(false);
   });
 
-  return () => {
-    removeScroll();
-    removeLayout();
-    gsap.killTweensOf(img);
-    img.remove();
-    delete services.dataset.activePlanet;
+  const traveler: Traveler = {
+    img,
+    useFlight(next) {
+      flight = next;
+      return () => {
+        if (flight === next) flight = undefined;
+      };
+    },
+  };
+
+  return {
+    stop: () => {
+      removeScroll();
+      removeLayout();
+      flight?.stop();
+      flight = undefined;
+      gsap.killTweensOf(img);
+      img.remove();
+      delete services.dataset.activePlanet;
+    },
+    traveler,
   };
 }
 
@@ -335,7 +384,7 @@ function readTier(): FxTier {
 // The effects layer (spec 005): marks the class in `data-fx-tier` and
 // downloads its own module unless the class is "off". Returns the cleanup; a
 // module that fails to load leaves no mark behind (RF-41).
-function effects(hub: ScrollHub): () => void {
+function effects(hub: ScrollHub, traveler: Traveler | null): () => void {
   const root = document.documentElement;
   const tier = readTier();
   if (tier === "off") return () => {};
@@ -344,7 +393,7 @@ function effects(hub: ScrollHub): () => void {
   let cancelled = false;
   import("../fx/fx-layer")
     .then((module) => {
-      if (!cancelled) stop = module.startFx(tier, { hub });
+      if (!cancelled) stop = module.startFx(tier, { hub, traveler });
     })
     .catch(() => {
       // Blocked or offline: the page is complete without the effects.
@@ -377,9 +426,9 @@ export function startMotion(): void {
       const removeReveal = revealBlocks(isWide(), hub, (create) => {
         context.add(create);
       });
-      const removeTraveler = travelingMac(hub);
+      const traveling = travelingMac(hub);
       const removeGesture = macGesture();
-      const removeEffects = effects(hub);
+      const removeEffects = effects(hub, traveling.traveler);
 
       // Smooth scrolling: only with a fine pointer (never on touch), and its
       // code is a separate download.
@@ -402,7 +451,7 @@ export function startMotion(): void {
         removeEffects();
         const scrollY = window.scrollY;
         removeReveal();
-        removeTraveler();
+        traveling.stop();
         hub.stop();
         delete root.dataset.motion;
         // Reverting must never move the visitor (spec 004: ScrollTrigger's
