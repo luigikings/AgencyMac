@@ -35,7 +35,6 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - El detector de filtraciones (`no-leaks`) revisa también specs y docs: escribir siempre `<subdominio>` y nunca `NOMBRE_SECRETO=valor`, ni como ejemplo.
 - Nada de URLs privadas, rutas locales ni datos personales en archivos versionados (historial público). Excepción: correos de autores en `OFL-*.txt`.
 - Tests con reloj inyectado: el reloj debe avanzar también en rojo, o el bucle de reintentos se cuelga.
-- Los agentes editan con Edit/Write, nunca con `python -c`/`node -e`/`sed -i`.
 
 ## Próximos pasos
 

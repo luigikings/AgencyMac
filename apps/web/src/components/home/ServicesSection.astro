@@ -117,6 +117,14 @@ const imageOf = (name: string) => {
   /* The reveal moves the halves sideways: never let that widen the page. */
   .service {
     overflow-x: clip;
+    /* Centres of the planet and of the text, where the glow and the dust of
+       the zone's ambient sit (lib/sky/ambient-css.ts). One column: the art on
+       top (2.5 rem of padding; the planet is 94 % of the art, which is at most
+       20 rem wide), the text below. */
+    --planet-x: 50%;
+    --planet-y: calc(2.5rem + min(20rem, 100vw - 2rem) * 0.47);
+    --text-x: 50%;
+    --text-y: 78%;
   }
 
   .service__inner {
@@ -140,8 +148,12 @@ const imageOf = (name: string) => {
     position: relative;
   }
 
+  /* Positioned, so it paints after the halo (also positioned) and the halo
+     stays behind the planet even when nothing transforms the picture (reduced
+     motion; R2). The orbit, after it, still passes in front. */
   .service__art :global(picture) {
     display: block;
+    position: relative;
   }
 
   .service__art :global(.service__image) {
@@ -167,6 +179,8 @@ const imageOf = (name: string) => {
     --halo-delay: -1.5s;
     --moon-s: 14s;
     --moon-delay: -3s;
+    /* Radius of the planet's sphere, in widths of the art (see the orbit). */
+    --disc: 0.315;
   }
 
   .service[data-planet="rankia"] {
@@ -184,6 +198,7 @@ const imageOf = (name: string) => {
     --moon-delay: -2s;
     --moon-s-2: 19s;
     --moon-delay-2: -11s;
+    --disc: 0.305;
   }
 
   .service[data-planet="adara"] {
@@ -199,6 +214,7 @@ const imageOf = (name: string) => {
     --halo-delay: -0.5s;
     --moon-s: 11s;
     --moon-delay: -5s;
+    --disc: 0.315;
   }
 
   /* The halo lives inside the box of the art, behind the planet. */
@@ -216,7 +232,19 @@ const imageOf = (name: string) => {
   }
 
   /* A flat ellipse around the planet, tilted. 90 % wide, so that turned it
-     stays inside the art; the moons ride it inside its own box. */
+     stays inside the art; the moons ride it inside its own box.
+     Seen from slightly above, its upper half (in its own, tilted frame) is
+     the far one and runs behind the planet: there the mask hides the orbit
+     and the moons over the disc of the planet, and they show again beside
+     it; the lower half passes in front (R2, RF-12). The disc is a circle on
+     the centre of the art, which is the centre of the orbit too, so it does
+     not change with the tilt: in the orbit's box (90 % of the art wide, 32 %
+     of a square planet image 94 % wide, so about 3 times wider than tall) a
+     circle of --disc of the art is an ellipse of --disc / 0.9 by
+     --disc / 0.3008. --disc (set for each planet above) is a hair under the
+     drawn sphere (0.31 to 0.32 of the art; Hexaweb is a polygon) and never
+     takes the ring of the image: the ring's own far side is already drawn
+     behind the sphere in the image. */
   .service__orbit {
     position: absolute;
     top: 34%;
@@ -225,6 +253,15 @@ const imageOf = (name: string) => {
     height: 32%;
     pointer-events: none;
     transform: rotate(var(--tilt));
+    mask-image:
+      linear-gradient(to bottom, transparent 50%, var(--color-text) 50%),
+      radial-gradient(
+        ellipse calc(var(--disc) / 0.9 * 100%) calc(var(--disc) / 0.3008 * 100%)
+          at 50% 50%,
+        transparent 97%,
+        var(--color-text) 100%
+      );
+    mask-repeat: no-repeat;
   }
 
   .service__orbit svg {
@@ -292,6 +329,14 @@ const imageOf = (name: string) => {
         infinite;
     }
 
+    /* The orbit floats with the planet (same numbers, same start), so the
+       part hidden behind the disc stays on the disc. It keeps its tilt: the
+       float moves it with `translate`, not `transform`. */
+    .service__orbit {
+      animation: service-float-orbit var(--float-s) ease-in-out
+        var(--float-delay) infinite;
+    }
+
     .service__art :global(.service__image) {
       animation: service-turn var(--turn-s) ease-in-out var(--turn-delay)
         infinite;
@@ -319,6 +364,17 @@ const imageOf = (name: string) => {
 
       50% {
         transform: translateY(calc(var(--float-px) * -1));
+      }
+    }
+
+    @keyframes service-float-orbit {
+      0%,
+      100% {
+        translate: 0 0;
+      }
+
+      50% {
+        translate: 0 calc(var(--float-px) * -1);
       }
     }
 
@@ -400,6 +456,21 @@ const imageOf = (name: string) => {
     /* Alternate the side of the planet: image left, then right, then left. */
     .service--flip .service__art {
       order: 2;
+    }
+
+    /* Two columns of (min(100 %, 60 rem) - 5 rem) / 2 inside 1 rem of padding
+       and a 3 rem gap: their centres are W / 4 + 0.25 rem either side of the
+       middle of the page (W = min(100 %, 60 rem)). */
+    .service {
+      --planet-x: calc(50% - min(100%, 60rem) / 4 - 0.25rem);
+      --planet-y: 50%;
+      --text-x: calc(50% + min(100%, 60rem) / 4 + 0.25rem);
+      --text-y: 50%;
+    }
+
+    .service--flip {
+      --planet-x: calc(50% + min(100%, 60rem) / 4 + 0.25rem);
+      --text-x: calc(50% - min(100%, 60rem) / 4 - 0.25rem);
     }
   }
 </style>

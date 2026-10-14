@@ -470,3 +470,232 @@ test.describe("No layout shift and no overflow with the planets alive", () => {
     }
   }
 });
+
+// R2 adjustment (2026-10-14, RF-12): the orbit is a tilted ellipse seen from
+// slightly above, so its far (upper) half runs behind the planet. While a moon
+// is on that half and over the disc of the planet, the planet hides it; on the
+// near half it passes in front. Measured on the pixels: the capture of the
+// moon's box with the moon shown and with it hidden.
+// Largest difference per colour channel between two captures of one area.
+async function pngDiff(page: Page, shown: Buffer, hidden: Buffer) {
+  return page.evaluate(
+    async ([a, b]) => {
+      const read = async (base64: string) => {
+        const blob = await (
+          await fetch(`data:image/png;base64,${base64}`)
+        ).blob();
+        const bitmap = await createImageBitmap(blob);
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(bitmap, 0, 0);
+        return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      };
+      const [da, db] = [await read(a!), await read(b!)];
+      let worst = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        for (let c = 0; c < 3; c++) {
+          worst = Math.max(worst, Math.abs(da[i + c]! - db[i + c]!));
+        }
+      }
+      return worst;
+    },
+    [shown.toString("base64"), hidden.toString("base64")],
+  );
+}
+
+async function moonPaintDiff(page: Page, moonSelector: string) {
+  const box = await page.locator(moonSelector).evaluate((m) => {
+    const r = m.getBoundingClientRect();
+    const x = Math.floor(r.x + window.scrollX);
+    const y = Math.floor(r.y + window.scrollY);
+    return {
+      x,
+      y,
+      width: Math.ceil(r.right + window.scrollX) - x,
+      height: Math.ceil(r.bottom + window.scrollY) - y,
+    };
+  });
+  const shoot = () => page.screenshot({ fullPage: true, clip: box });
+  const shown = await shoot();
+  await page
+    .locator(moonSelector)
+    .evaluate((m) => ((m as HTMLElement).style.visibility = "hidden"));
+  const hidden = await shoot();
+  await page
+    .locator(moonSelector)
+    .evaluate((m) => ((m as HTMLElement).style.visibility = ""));
+  return pngDiff(page, shown, hidden);
+}
+
+test.describe("Moons pass behind the planet on the far half of the orbit (RF-12, R2)", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  for (const { path } of homePages) {
+    for (const width of [375, 1280]) {
+      test(`${path} at ${width} px`, async ({ page }) => {
+        test.setTimeout(90_000);
+        await page.route("**/*.js", (route) => route.abort());
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        for (const planet of PLANETS) {
+          for (let moon = 1; moon <= planet.moons; moon++) {
+            const selector = `${block(planet.id)} [data-moon="${moon}"]`;
+            // Stop everything in the block but this moon's run around the
+            // orbit, and find its farthest and nearest points (in the frame of
+            // the tilted orbit) that lie over the disc of the planet.
+            const poses = await page.locator(selector).evaluate((el) => {
+              const root = el.closest(".service")!;
+              const moonAnim = el
+                .getAnimations()
+                .find(
+                  (a) => (a as CSSAnimation).animationName === "planet-moon",
+                )!;
+              for (const a of root.getAnimations({ subtree: true })) {
+                // The other moon of Rankia only waits (a cancelled CSS
+                // animation would be gone for its own turn).
+                if ((a as CSSAnimation).animationName === "planet-moon") {
+                  a.pause();
+                } else a.cancel();
+              }
+              moonAnim.pause();
+              const duration = Number(
+                moonAnim.effect!.getComputedTiming().duration,
+              );
+              const orbit = el.closest(".service__orbit")!;
+              const o = orbit.getBoundingClientRect();
+              const m = new DOMMatrix(getComputedStyle(orbit).transform);
+              const tilt = Math.atan2(m.b, m.a);
+              const img = root
+                .querySelector(".service__art img")!
+                .getBoundingClientRect();
+              const disc = {
+                x: img.x + img.width / 2,
+                y: img.y + img.height / 2,
+                // Well inside the drawn disc of every planet (about 0.33).
+                r: img.width * 0.27,
+              };
+              const samples = Array.from({ length: 48 }, (_, i) => {
+                const time = (duration * i) / 48;
+                moonAnim.currentTime = time;
+                const r = el.getBoundingClientRect();
+                const cx = r.x + r.width / 2 - (o.x + o.width / 2);
+                const cy = r.y + r.height / 2 - (o.y + o.height / 2);
+                // Into the frame of the orbit: undo the tilt.
+                const ly = -Math.sin(-tilt) * cx + Math.cos(-tilt) * cy;
+                const inDisc =
+                  Math.hypot(
+                    r.x + r.width / 2 - disc.x,
+                    r.y + r.height / 2 - disc.y,
+                  ) +
+                    r.width / 2 <=
+                  disc.r;
+                return { time, ly, inDisc };
+              });
+              const over = samples.filter((s) => s.inDisc);
+              const far = over.reduce((p, s) => (s.ly < p.ly ? s : p));
+              const near = over.reduce((p, s) => (s.ly > p.ly ? s : p));
+              return { far, near };
+            });
+            const at = async (time: number) =>
+              page.locator(selector).evaluate((el, t) => {
+                const anim = el
+                  .getAnimations()
+                  .find(
+                    (a) => (a as CSSAnimation).animationName === "planet-moon",
+                  )!;
+                anim.currentTime = t;
+              }, time);
+            const label = `${planet.id} moon ${moon}`;
+            expect(poses.far.ly, label).toBeLessThan(0);
+            expect(poses.near.ly, label).toBeGreaterThan(0);
+            await at(poses.far.time);
+            expect(
+              await moonPaintDiff(page, selector),
+              `${label}: painted over the planet on the far half`,
+            ).toBeLessThanOrEqual(8);
+            await at(poses.near.time);
+            expect(
+              await moonPaintDiff(page, selector),
+              `${label}: hidden on the near half`,
+            ).toBeGreaterThan(40);
+          }
+        }
+      });
+    }
+  }
+});
+
+test.describe("Still moons stay visible (RF-12, RF-40, R2)", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  for (const { path } of homePages) {
+    for (const width of [375, 1280]) {
+      test(`${path} at ${width} px: every still moon is painted`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        for (const planet of PLANETS) {
+          for (let moon = 1; moon <= planet.moons; moon++) {
+            const selector = `${block(planet.id)} [data-moon="${moon}"]`;
+            expect(
+              await moonPaintDiff(page, selector),
+              `${planet.id} moon ${moon}`,
+            ).toBeGreaterThan(40);
+          }
+        }
+      });
+    }
+  }
+});
+
+// R2 (2026-10-14): the halo glows behind the planet, never over it. Without
+// motion the picture is not transformed, so it must still paint after the
+// (positioned) halo. Measured on the centre of the planet with the halo shown
+// and hidden; the halo is painted solid yellow for the test, so that one over
+// the planet would be obvious (the images' lossy alpha lets a few levels
+// through).
+for (const reduced of [false, true]) {
+  test.describe(`The halo stays behind the planet, ${reduced ? "reduced motion" : "with motion"} (RF-11, R2)`, () => {
+    test.use({ reducedMotion: reduced ? "reduce" : "no-preference" });
+
+    for (const { path } of homePages) {
+      test(`${path}`, async ({ page }) => {
+        await page.route("**/*.js", (route) => route.abort());
+        await page.goto(path);
+        for (const planet of PLANETS) {
+          const root = page.locator(block(planet.id));
+          await root.evaluate((el) => {
+            // Paused, not cancelled: a running float keeps its transform.
+            for (const a of el.getAnimations({ subtree: true })) a.pause();
+            const halo = el.querySelector<HTMLElement>(".service__halo")!;
+            halo.style.background = "var(--color-button-hover)";
+            halo.style.opacity = "1";
+          });
+          const box = await root
+            .locator(".service__art img")
+            .evaluate((img) => {
+              const r = img.getBoundingClientRect();
+              const size = Math.round(r.width * 0.2);
+              return {
+                x: Math.round(r.x + window.scrollX + r.width / 2 - size / 2),
+                y: Math.round(r.y + window.scrollY + r.height * 0.3 - size / 2),
+                width: size,
+                height: size,
+              };
+            });
+          const shoot = () => page.screenshot({ fullPage: true, clip: box });
+          const shown = await shoot();
+          await root
+            .locator(".service__halo")
+            .evaluate((h) => ((h as HTMLElement).style.visibility = "hidden"));
+          const hidden = await shoot();
+          expect(
+            await pngDiff(page, shown, hidden),
+            planet.id,
+          ).toBeLessThanOrEqual(24);
+        }
+      });
+    }
+  });
+}

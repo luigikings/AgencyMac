@@ -23,6 +23,15 @@ export type Ambient = {
   dustAlpha: number;
   /** Base colour of the next zone: the 10 rem fade at the bottom goes there. */
   fadeTo: ColorName;
+  /**
+   * True when the next zone sits right below this one: their 10 rem fade
+   * straddles the boundary (5 rem at the bottom of this zone, 5 rem at the top
+   * of the next), so each colour changes at the boundary and not half a block
+   * earlier. False when something else comes in between (the intro of the
+   * services after the hero, the footer after the contact): the whole fade
+   * stays at the bottom of this zone.
+   */
+  sharedFade: boolean;
 };
 
 /**
@@ -45,6 +54,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.22,
     dustAlpha: 0.12,
     fadeTo: "planetHexawebBg",
+    sharedFade: false,
   },
   {
     id: "hexaweb",
@@ -54,6 +64,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.12,
     dustAlpha: 0.02,
     fadeTo: "planetRankiaBg",
+    sharedFade: true,
   },
   {
     id: "rankia",
@@ -63,6 +74,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.3,
     dustAlpha: 0.08,
     fadeTo: "planetAdaraBg",
+    sharedFade: true,
   },
   {
     id: "adara",
@@ -72,6 +84,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.17,
     dustAlpha: 0.04,
     fadeTo: "bg",
+    sharedFade: true,
   },
   {
     id: "projects",
@@ -81,6 +94,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.22,
     dustAlpha: 0.1,
     fadeTo: "bgDark",
+    sharedFade: true,
   },
   {
     id: "team",
@@ -90,6 +104,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.2,
     dustAlpha: 0.12,
     fadeTo: "bg",
+    sharedFade: true,
   },
   {
     id: "contact",
@@ -99,6 +114,7 @@ export const AMBIENTS: readonly Ambient[] = [
     glowAlpha: 0.2,
     dustAlpha: 0.06,
     fadeTo: "bgDark",
+    sharedFade: false,
   },
 ];
 
