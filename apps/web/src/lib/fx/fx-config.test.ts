@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUBBLE_BG,
+  BURST_CLICK,
+  BURST_RADIUS_RATIO,
+  BURST_SPEED_PX_MS,
+  BURST_TONES,
+  BURST_TURBO,
+  BUBBLE_FG,
+  BUBBLE_GAP_PX,
+  BUBBLE_MARGIN_PX,
+  BUBBLE_MS,
+  BUBBLE_POP_MS,
+  BUBBLE_TAIL_REACH_PX,
+  BUBBLE_TEXT_GAP_PX,
+  BUBBLE_WIDTHS_PX,
   DEGRADE_LIMIT_MS,
   DEGRADE_WINDOW_FRAMES,
   FX_TIERS,
+  GREET_MS,
+  GREET_SWAY_DEG,
   JUMP_MAX_MS,
+  LOOK_TAU_MS,
+  MAC_BOUNCE_MS,
+  MAC_BOUNCE_PEAK,
+  MAC_BOUNCE_SCALE,
   PARTICLE_LIFE_MAX_MS,
+  PARTICLE_LIFE_MS,
   PLANET_GROW_TAU_MS,
   PLANET_HOVER_SCALE,
   PLANET_POINTER_DEPTH,
@@ -14,9 +35,22 @@ import {
   SPARK_SPEED_PX_MS,
   SPARK_TONES,
   TIER_PARAMS,
+  TRAIL_JITTER_PX,
+  TRAIL_REAR_RATIO,
+  TRAIL_SPEED_PX_MS,
+  TRAIL_SPREAD_DEG,
+  TRAIL_TONES,
+  TURBO_COOLDOWN_MS,
+  TURBO_LIFT_RATIO,
+  TURBO_MARGIN_PX,
+  TURBO_MIN_SCALE,
+  TURBO_MS,
+  TURBO_SPIN_DEG,
+  TURBO_SPIN_DELAY,
   isFxTier,
 } from "./fx-config";
 import { colors } from "../../styles/tokens";
+import { contrastRatio } from "../contrast";
 
 describe("fx-config (spec 005)", () => {
   it("lists the device tiers from off to high", () => {
@@ -186,5 +220,128 @@ describe("planet parallax depths (RF-13)", () => {
       expect(depth).toBeLessThanOrEqual(1);
     }
     expect(new Set(depths).size).toBe(3);
+  });
+});
+
+describe("Mac's trail, bounce and bubbles (RF-23, RF-24, RF-27)", () => {
+  it("fades every trail particle in under 0.6 s, with room for a frame", () => {
+    const [min, max] = PARTICLE_LIFE_MS.trail;
+    expect(min).toBeGreaterThan(0);
+    expect(max).toBeGreaterThan(min);
+    expect(max).toBeLessThanOrEqual(PARTICLE_LIFE_MAX_MS);
+    expect(max + 50).toBeLessThan(600);
+  });
+
+  it("paints the trail only with brand colour tokens", () => {
+    expect(TRAIL_TONES.length).toBeGreaterThan(1);
+    for (const tone of TRAIL_TONES) {
+      expect(Object.keys(colors)).toContain(tone);
+    }
+    expect(new Set(TRAIL_TONES).size).toBe(TRAIL_TONES.length);
+  });
+
+  it("emits the trail from Mac's back, slowly and close to him", () => {
+    expect(TRAIL_REAR_RATIO).toBeGreaterThan(0);
+    expect(TRAIL_REAR_RATIO).toBeLessThanOrEqual(0.5);
+    expect(TRAIL_JITTER_PX).toBeGreaterThanOrEqual(0);
+    expect(TRAIL_SPEED_PX_MS[0]).toBeGreaterThanOrEqual(0);
+    expect(TRAIL_SPEED_PX_MS[1]).toBeGreaterThan(TRAIL_SPEED_PX_MS[0]);
+    expect(TRAIL_SPREAD_DEG).toBeGreaterThan(0);
+    expect(TRAIL_SPREAD_DEG).toBeLessThan(90);
+  });
+
+  it("bounces on arrival up to a scale of 1.12 and back in 0.4 s", () => {
+    expect(MAC_BOUNCE_SCALE).toBe(1.12);
+    expect(MAC_BOUNCE_MS).toBe(400);
+    expect(MAC_BOUNCE_PEAK).toBeGreaterThan(0);
+    expect(MAC_BOUNCE_PEAK).toBeLessThan(1);
+  });
+
+  it("greets with a sway of 0.8 s and eases the gaze back well inside 1 s", () => {
+    expect(GREET_MS).toBe(800);
+    expect(GREET_SWAY_DEG).toBeGreaterThan(0);
+    expect(GREET_SWAY_DEG).toBeLessThanOrEqual(12);
+    // From 8 px to under 0.5 px (a sixteenth) in at most 0.7 s.
+    expect(LOOK_TAU_MS * Math.log(16)).toBeLessThanOrEqual(700);
+  });
+
+  it("shows a bubble for 2.0 to 2.8 s, away from Mac and the edges", () => {
+    expect(BUBBLE_MS).toEqual([2000, 2800]);
+    expect(BUBBLE_GAP_PX).toBeGreaterThan(0);
+    expect(BUBBLE_MARGIN_PX).toBeGreaterThanOrEqual(8);
+  });
+
+  // T23: a bubble never covers a text; it may slide along Mac's side, as far
+  // as its tail still points at him, or wrap into narrower lines.
+  it("keeps clear of texts, slides with its tail on Mac and wraps narrower", () => {
+    expect(BUBBLE_TEXT_GAP_PX).toBeGreaterThan(0);
+    expect(BUBBLE_TEXT_GAP_PX).toBeLessThanOrEqual(BUBBLE_GAP_PX);
+    // The tail (12 px, turned) sits at least 12 px inside the corner.
+    expect(BUBBLE_TAIL_REACH_PX).toBeGreaterThanOrEqual(18);
+    expect(BUBBLE_TAIL_REACH_PX).toBeLessThanOrEqual(40);
+    // Narrower and narrower, never below what the longest word needs.
+    expect(BUBBLE_WIDTHS_PX.length).toBeGreaterThanOrEqual(1);
+    for (let i = 1; i < BUBBLE_WIDTHS_PX.length; i++) {
+      expect(BUBBLE_WIDTHS_PX[i]).toBeLessThan(BUBBLE_WIDTHS_PX[i - 1]!);
+    }
+    expect(Math.min(...BUBBLE_WIDTHS_PX)).toBeGreaterThanOrEqual(160);
+  });
+});
+
+describe("Mac's bubble colours (RF-27: solid, readable)", () => {
+  it("is a solid brand token with AA contrast for its text", () => {
+    expect(Object.keys(colors)).toContain(BUBBLE_BG);
+    expect(Object.keys(colors)).toContain(BUBBLE_FG);
+    expect(
+      contrastRatio(colors[BUBBLE_FG].value, colors[BUBBLE_BG].value),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("pops in quickly, well inside its shortest life", () => {
+    expect(BUBBLE_POP_MS).toBeGreaterThan(0);
+    expect(BUBBLE_POP_MS).toBeLessThanOrEqual(250);
+  });
+});
+
+describe("Mac's bursts and turbo mode (RF-28, RF-29)", () => {
+  it("bursts 12 to 20 particles on a press and at least 60 in turbo mode", () => {
+    expect(BURST_CLICK).toEqual([12, 20]);
+    expect(BURST_TURBO).toBeGreaterThanOrEqual(60);
+    // Within the largest class limit (RF-37).
+    expect(BURST_TURBO).toBeLessThanOrEqual(TIER_PARAMS.high.maxParticles);
+  });
+
+  it("throws the burst out of Mac, fast but short-lived", () => {
+    const [min, max] = PARTICLE_LIFE_MS.burst;
+    expect(min).toBeGreaterThan(0);
+    expect(max).toBeGreaterThan(min);
+    expect(max).toBeLessThanOrEqual(1000);
+    expect(BURST_SPEED_PX_MS[0]).toBeGreaterThan(0);
+    expect(BURST_SPEED_PX_MS[1]).toBeGreaterThan(BURST_SPEED_PX_MS[0]);
+    expect(BURST_RADIUS_RATIO).toBeGreaterThan(0);
+    expect(BURST_RADIUS_RATIO).toBeLessThanOrEqual(0.5);
+  });
+
+  it("paints the bursts only with brand colour tokens", () => {
+    expect(BURST_TONES.length).toBeGreaterThan(1);
+    for (const tone of BURST_TONES) {
+      expect(Object.keys(colors)).toContain(tone);
+    }
+    expect(new Set(BURST_TONES).size).toBe(BURST_TONES.length);
+  });
+
+  it("crosses the screen in at most 1.4 s, inside the window, with a spin", () => {
+    expect(TURBO_MS).toBeGreaterThan(0);
+    // A frame of room for the mark to go.
+    expect(TURBO_MS + 50).toBeLessThanOrEqual(1400);
+    expect(TURBO_MARGIN_PX).toBeGreaterThanOrEqual(8);
+    expect(TURBO_LIFT_RATIO).toBeGreaterThan(0);
+    expect(TURBO_LIFT_RATIO).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(TURBO_SPIN_DEG)).toBeGreaterThan(0);
+    expect(TURBO_MIN_SCALE).toBeGreaterThan(0.3);
+    expect(TURBO_MIN_SCALE).toBeLessThanOrEqual(1);
+    expect(TURBO_SPIN_DELAY).toBeGreaterThanOrEqual(0);
+    expect(TURBO_SPIN_DELAY).toBeLessThan(0.5);
+    expect(TURBO_COOLDOWN_MS).toBe(10_000);
   });
 });

@@ -41,8 +41,10 @@ export const SMOOTH_IDLE_FRAMES = 3;
 
 // GSAP's ticker only runs while a tween plays: every this many frames it checks
 // whether any is left and sleeps if not (GSAP's `autoSleep`, 120 by default).
-// 60 puts it to sleep about a second after the last tween (RF-39, plan 14.2).
-export const GSAP_AUTO_SLEEP_FRAMES = 60;
+// Counted in frames, not time: with 60 a busy CPU (20 frames a second) kept it
+// awake 3 s after the last tween. 6 puts it to sleep 0.1 s after it at 60
+// frames a second and 0.3 s at 20 (RF-39, plan 14.2; T23).
+export const GSAP_AUTO_SLEEP_FRAMES = 6;
 
 // Two-column layout from this width (matches the CSS breakpoint of the
 // service blocks).

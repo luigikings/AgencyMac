@@ -7,6 +7,7 @@ import {
   flightTilt,
   maxDeviation,
   pointAt,
+  rearOf,
   retarget,
   tiltFor,
 } from "./mac-path";
@@ -255,5 +256,18 @@ describe("flightTilt (RF-22)", () => {
         last = now;
       }
     }
+  });
+});
+
+describe("rearOf (RF-23: the trail comes out of Mac's back)", () => {
+  it("is behind the centre, against the direction of flight", () => {
+    expect(rearOf({ x: 100, y: 100 }, 0, 20).x).toBeCloseTo(80);
+    expect(rearOf({ x: 100, y: 100 }, 0, 20).y).toBeCloseTo(100);
+    expect(rearOf({ x: 100, y: 100 }, 90, 20).y).toBeCloseTo(80);
+    expect(rearOf({ x: 100, y: 100 }, 180, 20).x).toBeCloseTo(120);
+  });
+
+  it("is the centre itself at a distance of 0", () => {
+    expect(rearOf({ x: 5, y: 7 }, 33, 0)).toEqual({ x: 5, y: 7 });
   });
 });

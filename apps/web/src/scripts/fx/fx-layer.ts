@@ -4,8 +4,15 @@ import { scrollParallax } from "../../lib/sky/parallax";
 import { mulberry32 } from "../../lib/sky/rng";
 import type { Traveler } from "../motion/home-motion";
 import type { ScrollHub } from "../motion/scroll-hub";
+import { createBubbles } from "./bubbles";
 import { createFxCanvas, type FxCanvas } from "./canvas";
-import { macFlight } from "./mac-fx";
+import {
+  macBursts,
+  macFlight,
+  macReactions,
+  type BurstReport,
+  type TrailReport,
+} from "./mac-fx";
 import { planetFx } from "./planet-fx";
 import { shootingStars } from "./shooting-stars";
 
@@ -106,20 +113,54 @@ export function startFx(tier: FxTier, { hub, traveler }: FxCore): Cleanup {
     pauseWhenHidden(hooks),
     starParallax(hub, params.scrollParallaxLayers),
   ];
-  // RF-21, RF-22: Mac flies along a curve between planets, in every class.
-  if (traveler) cleanups.push(macFlight(traveler));
   // Without 2D drawing there is no canvas, and the effects drawn on it are
   // simply left out (RF-41).
-  const canvas = createFxCanvas(params.canvasDensity);
+  const canvas = createFxCanvas(params.canvasDensity, params.maxParticles);
   if (canvas) hooks.onHide.push(canvas.halt);
+  // RF-27: Mac's single bubble. It goes with the tab hidden or a new layout
+  // (its place was measured on the old one).
+  const bubbles = createBubbles(rng);
+  hooks.onHide.push(bubbles.clear);
+  cleanups.push(hub.onLayout(bubbles.clear), bubbles.stop);
+  // RF-21 to RF-24: Mac flies along a curve between planets, in every class,
+  // with his trail, the bounce on landing and the planet's line.
+  // RF-25 to RF-27: the gaze (fine pointer, middle and high class), the
+  // greeting after the hero's landing and the rest line (every class).
+  // RF-28, RF-29: bursts and turbo mode when the hero's Mac is pressed.
+  const bursts = macBursts({ canvas, tier, rng });
+  if (bursts) cleanups.push(bursts.stop);
+  const finePointer =
+    params.pointerEffects && window.matchMedia(FINE_POINTER_QUERY).matches;
+  const reactions = macReactions({
+    heroMac: document.querySelector<HTMLElement>(".hero__mac"),
+    traveler: traveler?.img ?? null,
+    bubbles,
+    bursts,
+    gaze: finePointer,
+    hooks,
+  });
+  cleanups.push(reactions.stop);
+  let trail: (() => TrailReport) | null = null;
+  if (traveler) {
+    const flight = macFlight({
+      traveler,
+      canvas,
+      tier,
+      rng,
+      bubbles,
+      onTakeOff: () => reactions.letGo(traveler.img),
+    });
+    trail = flight.report;
+    cleanups.push(flight.stop);
+  }
   // RF-13, RF-14: planets that follow the cursor, grow and spark under it.
-  if (params.pointerEffects && window.matchMedia(FINE_POINTER_QUERY).matches) {
+  if (finePointer) {
     cleanups.push(planetFx({ canvas, tier, rng, hooks }));
   }
   if (canvas) {
     cleanups.push(shootingStars({ canvas, tier, rng, hooks }), canvas.stop);
   }
-  cleanups.push(frameReport(canvas));
+  cleanups.push(frameReport(canvas, trail, bursts?.report ?? null));
   root.dataset.fx = "on";
 
   return () => {
@@ -138,9 +179,16 @@ function visitSeed(): number {
 
 // Plan section 4, `fx:report`: on that event the frames drawn, the mean and
 // p95 own cost per frame (ms) and the live particles are written on <html>
-// (data-fx-frames, data-fx-frame-avg, data-fx-frame-p95, data-fx-particles).
+// (data-fx-frames, data-fx-frame-avg, data-fx-frame-p95, data-fx-particles),
+// and Mac's trail: particles emitted so far and alive now
+// (data-fx-trail-emitted, data-fx-trail-alive), and Mac's bursts: particles
+// emitted so far and alive now (data-fx-burst-emitted, data-fx-burst-alive).
 // Only the tests ask for it.
-function frameReport(canvas: FxCanvas | null): Cleanup {
+function frameReport(
+  canvas: FxCanvas | null,
+  trail: (() => TrailReport) | null,
+  bursts: (() => BurstReport) | null,
+): Cleanup {
   const root = document.documentElement;
   const write = () => {
     const report = canvas?.report() ?? {
@@ -153,6 +201,12 @@ function frameReport(canvas: FxCanvas | null): Cleanup {
     root.dataset.fxFrameAvg = String(report.avg);
     root.dataset.fxFrameP95 = String(report.p95);
     root.dataset.fxParticles = String(report.particles);
+    const { emitted, alive } = trail?.() ?? { emitted: 0, alive: 0 };
+    root.dataset.fxTrailEmitted = String(emitted);
+    root.dataset.fxTrailAlive = String(alive);
+    const burst = bursts?.() ?? { emitted: 0, alive: 0 };
+    root.dataset.fxBurstEmitted = String(burst.emitted);
+    root.dataset.fxBurstAlive = String(burst.alive);
   };
   document.addEventListener("fx:report", write);
   return () => {
@@ -161,5 +215,9 @@ function frameReport(canvas: FxCanvas | null): Cleanup {
     delete root.dataset.fxFrameAvg;
     delete root.dataset.fxFrameP95;
     delete root.dataset.fxParticles;
+    delete root.dataset.fxTrailEmitted;
+    delete root.dataset.fxTrailAlive;
+    delete root.dataset.fxBurstEmitted;
+    delete root.dataset.fxBurstAlive;
   };
 }

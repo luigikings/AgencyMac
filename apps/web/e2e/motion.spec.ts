@@ -859,6 +859,16 @@ for (const { path, locale } of homePages) {
     }) => {
       await page.goto(path);
       await page.waitForSelector(READY, { timeout: 10_000 });
+      // Spec 005 (T21, RF-26): after the hero's landing Mac greets with a
+      // sway of 0.8 s, and Playwright's click waits for him to stand still,
+      // which would count in the time measured here. Let it go first.
+      await page.waitForSelector('html[data-fx="on"]', { timeout: 10_000 });
+      await page.waitForTimeout(2_000);
+      await expect(page.locator(GESTURE)).not.toHaveAttribute(
+        "data-mac-greet",
+        /.+/,
+        { timeout: 2_000 },
+      );
       const textBefore = await page.locator("#hero").innerText();
       await expect(page.locator(GESTURE)).not.toHaveAttribute(
         "data-mac-gesture",

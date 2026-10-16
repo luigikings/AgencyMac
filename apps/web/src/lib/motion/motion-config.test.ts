@@ -48,13 +48,14 @@ describe("motion-config", () => {
   });
 
   // RF-39: GSAP's ticker checks every GSAP_AUTO_SLEEP_FRAMES frames whether a
-  // tween is left and sleeps if not: asleep at most 1 s after the last tween at
-  // 60 frames per second (2 s at 30), inside the 2.5 s of the rest test even
-  // when frames come slower. GSAP's default (120) could take 4 s.
-  it("lets GSAP's ticker sleep about a second after the last tween", () => {
+  // tween is left and sleeps if not, so its tail after the last tween is
+  // counted in frames, not time: with a busy CPU (20 frames a second, seen in
+  // the rest tests under load) 60 frames kept it awake for 3 s, inside the 2 s
+  // the rest test counts. A few frames keep the tail under 0.5 s even then.
+  it("lets GSAP's ticker sleep within 0.5 s of the last tween, even at 20 frames a second", () => {
     expect(Number.isInteger(GSAP_AUTO_SLEEP_FRAMES)).toBe(true);
     expect(GSAP_AUTO_SLEEP_FRAMES).toBeGreaterThanOrEqual(1);
-    expect(GSAP_AUTO_SLEEP_FRAMES).toBeLessThanOrEqual(60);
+    expect(GSAP_AUTO_SLEEP_FRAMES * (1000 / 20)).toBeLessThanOrEqual(500);
   });
 
   it("sizes and times the travelling Mac", () => {

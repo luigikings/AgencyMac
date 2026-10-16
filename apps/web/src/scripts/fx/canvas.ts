@@ -3,6 +3,7 @@ import {
   CANVAS_RESIZE_DEBOUNCE_MS,
   FRAME_COST_SAMPLES,
 } from "../../lib/fx/fx-config";
+import { cssVariableName, type ColorName } from "../../styles/tokens";
 
 // The single effects canvas (spec 005, plan D5): fixed over the page, out of
 // the way of the pointer and of assistive technology (RF-42), with its
@@ -38,14 +39,37 @@ export type FxCanvas = {
   halt(): void;
   /** Frames drawn so far, mean and p95 cost of the latest, particles. */
   report(): { frames: number; avg: number; p95: number; particles: number };
+  /**
+   * Particles that can still be created without going past the limit of the
+   * class (RF-37), counting those of every painter alive now.
+   */
+  room(): number;
   /** Removes the canvas and everything it listens to. */
   stop(): void;
 };
 
+/**
+ * Values of colour tokens as the canvas writes them (read once from the CSS
+ * variables: no hex outside tokens.ts).
+ */
+export function toneValues(
+  ctx: CanvasRenderingContext2D,
+  tones: readonly ColorName[],
+): string[] {
+  const style = getComputedStyle(document.documentElement);
+  return tones.map((tone) => {
+    ctx.fillStyle = style.getPropertyValue(cssVariableName(tone)).trim();
+    return String(ctx.fillStyle);
+  });
+}
+
 /** Padding around the marked boxes when they are wiped, in CSS px. */
 const WIPE_PAD = 4;
 
-export function createFxCanvas(maxDensity: number): FxCanvas | null {
+export function createFxCanvas(
+  maxDensity: number,
+  maxParticles: number,
+): FxCanvas | null {
   const el = document.createElement("canvas");
   const ctx = el.getContext("2d");
   if (!ctx) return null;
@@ -141,6 +165,9 @@ export function createFxCanvas(maxDensity: number): FxCanvas | null {
     frame = busy || dirty ? window.requestAnimationFrame(tick) : 0;
   };
 
+  const alive = () =>
+    painters.reduce((sum, p) => sum + (p.particles?.() ?? 0), 0);
+
   const halt = () => {
     if (frame) window.cancelAnimationFrame(frame);
     frame = 0;
@@ -166,9 +193,10 @@ export function createFxCanvas(maxDensity: number): FxCanvas | null {
         frames,
         avg: stats.avg,
         p95: stats.p95,
-        particles: painters.reduce((sum, p) => sum + (p.particles?.() ?? 0), 0),
+        particles: alive(),
       };
     },
+    room: () => Math.max(0, maxParticles - alive()),
     stop() {
       halt();
       window.clearTimeout(resizeTimer);

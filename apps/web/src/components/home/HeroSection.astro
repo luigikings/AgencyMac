@@ -230,6 +230,10 @@ const { locale } = Astro.props;
     display: block;
     width: 100%;
     height: auto;
+    /* No browser tap highlight when the animation layer makes him a button
+       (a translucent square that turned with him in turbo mode); the keyboard
+       focus stays visible (:focus-visible, below). */
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Decoration (spec 005, RF-19): none of it covers text, takes focus or

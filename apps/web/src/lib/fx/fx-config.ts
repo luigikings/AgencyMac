@@ -181,7 +181,9 @@ export const PARTICLE_KINDS: readonly ParticleKind[] = [
 export const PARTICLE_LIFE_MS: Readonly<
   Record<ParticleKind, readonly [number, number]>
 > = {
-  trail: [300, 550],
+  // The last one emitted is gone at most 500 ms after Mac lands, a frame or
+  // two under the 0.6 s of RF-23.
+  trail: [300, 500],
   burst: [500, 900],
   spark: [400, 800],
   cursor: [300, 550],
@@ -203,6 +205,32 @@ export const PARTICLE_SIZE_PX = [1.5, 3.5] as const;
 
 /** Flight speed (px/s) from which the trail is emitted at its full rate. */
 export const TRAIL_FULL_RATE_SPEED_PX_S = 60;
+
+// Mac's trail (RF-23).
+/** Warm brand colours of the trail (token names: the canvas reads them). */
+export const TRAIL_TONES: readonly ColorName[] = [
+  "buttonHover",
+  "button",
+  "logoGradient1",
+  "logoGradient2",
+  "text",
+];
+/** The trail leaves Mac this fraction of his size behind his centre. */
+export const TRAIL_REAR_RATIO = 0.32;
+/** Random offset of each trail particle around that point, in px. */
+export const TRAIL_JITTER_PX = 4;
+/** [min, max] drift speed of a trail particle, in px per ms. */
+export const TRAIL_SPEED_PX_MS = [0.01, 0.05] as const;
+/** Largest angle between a particle's drift and straight back, in degrees. */
+export const TRAIL_SPREAD_DEG = 28;
+
+// Arrival bounce (RF-24).
+/** Mac grows up to this scale when he lands, and back to 1. */
+export const MAC_BOUNCE_SCALE = 1.12;
+/** Duration of the whole bounce, in ms. */
+export const MAC_BOUNCE_MS = 400;
+/** Part of the bounce (0..1) spent growing; the rest is the way back. */
+export const MAC_BOUNCE_PEAK = 0.4;
 
 // Mac's flight (RF-21, RF-22).
 /** The curve bends this fraction of the distance (at least MIN_BEND_PX). */
@@ -227,12 +255,73 @@ export const LOOK_MAX_DEG = 6;
 export const LOOK_MAX_PX = 8;
 /** Distance of the cursor (px) from which the gaze is at its maximum. */
 export const LOOK_FULL_DISTANCE_PX = 400;
+/** Time constant (ms) of the gaze easing towards its target and back. */
+export const LOOK_TAU_MS = 150;
+/** The greeting (RF-26): a sway of this duration (ms) and amplitude (deg). */
+export const GREET_MS = 800;
+export const GREET_SWAY_DEG = 9;
 export const TURBO_CLICKS = 5;
 export const TURBO_WINDOW_MS = 3000;
 export const TURBO_COOLDOWN_MS = 10000;
 export const IDLE_AFTER_MS = 8000;
 /** A bubble stays on screen between these two durations, in ms. */
 export const BUBBLE_MS = [2000, 2800] as const;
+/** Space between a bubble and Mac (and any button it keeps clear of), in px. */
+export const BUBBLE_GAP_PX = 10;
+/** Smallest space between a bubble and the edges of the window, in px. */
+export const BUBBLE_MARGIN_PX = 12;
+/** Smallest space between a bubble and any text of the page, in px (T23). */
+export const BUBBLE_TEXT_GAP_PX = 4;
+/**
+ * A bubble may slide along Mac's side as long as his centre stays this far
+ * inside its edge, so its tail still points at him (T23).
+ */
+export const BUBBLE_TAIL_REACH_PX = 24;
+/**
+ * Narrower widths (px) a bubble wraps into, in this order, when at its full
+ * width every place next to Mac would cover a text (T23).
+ */
+export const BUBBLE_WIDTHS_PX = [260, 200] as const;
+/** Solid background of the bubble and colour of its text (token names). */
+export const BUBBLE_BG: ColorName = "text";
+export const BUBBLE_FG: ColorName = "bgDark";
+/** The bubble grows into place in this time, in ms. */
+export const BUBBLE_POP_MS = 180;
+
+// Bursts and turbo mode (RF-28, RF-29).
+/** Particles of the burst of a press on Mac: [min, max], both included. */
+export const BURST_CLICK = [12, 20] as const;
+/** Particles of the burst of turbo mode (always within the class limit). */
+export const BURST_TURBO = 64;
+/** [min, max] speed of a burst particle when it leaves Mac, in px per ms. */
+export const BURST_SPEED_PX_MS = [0.06, 0.24] as const;
+/** The burst starts on a circle of this fraction of Mac's width. */
+export const BURST_RADIUS_RATIO = 0.3;
+/** Brand colours of the bursts (token names: the canvas reads their value). */
+export const BURST_TONES: readonly ColorName[] = [
+  "buttonHover",
+  "button",
+  "logoGradient1",
+  "logoGradient3",
+  "accentGreen",
+  "text",
+];
+/** Turbo mode: Mac's arc across the window lasts this long, in ms. */
+export const TURBO_MS = 1200;
+/** Highest rise of the arc, as a fraction of the window's height. */
+export const TURBO_LIFT_RATIO = 0.25;
+/** Space the arc leaves between Mac and the edges of the window, in px. */
+export const TURBO_MARGIN_PX = 12;
+/** Mac turns this much on the arc (towards where he flies), in degrees. */
+export const TURBO_SPIN_DEG = 360;
+/** Smallest size of Mac on the arc, far away in the middle of it. */
+export const TURBO_MIN_SCALE = 0.6;
+/**
+ * Part of the arc at each end (of its eased progress) where Mac does not turn
+ * yet: he leaves and arrives straight, so his turn never reaches past the
+ * edge he starts next to.
+ */
+export const TURBO_SPIN_DELAY = 0.15;
 
 // Space jump (RF-31).
 /** Longest and shortest duration of the jump, in ms. */

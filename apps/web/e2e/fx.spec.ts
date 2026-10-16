@@ -903,6 +903,15 @@ for (const { path } of homePages) {
   // smooth scrolling (plan D19, section 14). Also once a wheel scroll has
   // ended (Lenis goes to sleep) and once a block has appeared and the active
   // planet has changed (GSAP's ticker goes to sleep).
+  //
+  // An effect still in progress during the count is not rest: a shooting star
+  // (RF-4, every 8 s or more), or, with a busy CPU, a smooth scroll or a
+  // reveal still running (frames of 300 ms or more; GSAP counts a frame of
+  // over 500 ms as 33 ms). The count then waits for the page to settle and is
+  // taken again (up to 3 times), with the same limit; the page has to reach
+  // rest each time. A page that asks for frames while nothing moves (GSAP's
+  // ticker awake with no tween left, T23) still fails: those frames change no
+  // style and no scroll.
   test.describe(`${path}: no frames at rest (RF-39)`, () => {
     const CASES = [
       {
@@ -926,16 +935,46 @@ for (const { path } of homePages) {
     // The last planet block: below the fold in both viewports.
     const LAST = SERVICES.length - 1;
 
+    type Rest = {
+      rafCalls: number;
+      /** When something moved (performance.now): a style, a class, the scroll. */
+      moves: number[];
+      /** Shooting stars, from start to end (Infinity while one is on). */
+      stars: [number, number][];
+    };
+
     async function start(page: Page, item: (typeof CASES)[number]) {
       await simulate(page, item.signals);
       await page.addInitScript(() => {
-        const w = window as Window & { __rafCalls?: number };
+        const rest: Rest = { rafCalls: 0, moves: [], stars: [] };
+        (window as Window & { __rest?: Rest }).__rest = rest;
         const original = window.requestAnimationFrame.bind(window);
-        w.__rafCalls = 0;
         window.requestAnimationFrame = (callback) => {
-          w.__rafCalls!++;
+          rest.rafCalls++;
           return original(callback);
         };
+        const moved = () => rest.moves.push(performance.now());
+        new MutationObserver(moved).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["style", "class"],
+        });
+        addEventListener("scroll", moved, { capture: true, passive: true });
+        const open = new Map<number, [number, number]>();
+        document.addEventListener("fx:shooting-star", (event) => {
+          const { phase, id } = (
+            event as CustomEvent<{ phase: string; id: number }>
+          ).detail;
+          if (phase === "start") {
+            const span: [number, number] = [performance.now(), Infinity];
+            open.set(id, span);
+            rest.stars.push(span);
+          } else {
+            const span = open.get(id);
+            if (span) span[1] = performance.now();
+            open.delete(id);
+          }
+        });
       });
       await page.goto(path);
       await page.waitForSelector(FX_ON, { timeout: 10_000 });
@@ -948,17 +987,68 @@ for (const { path } of homePages) {
       );
     }
 
-    /** rAF calls in 2 s, counted from now. */
-    async function framesIn2s(page: Page, label: string) {
-      const calls = () =>
-        page.evaluate(
-          () => (window as Window & { __rafCalls?: number }).__rafCalls!,
+    /** Waits until the scroll has stopped and smooth scrolling is asleep. */
+    async function scrollEnded(page: Page) {
+      await expect
+        .poll(
+          async () => {
+            const at = await page.evaluate(() => ({
+              y: scrollY,
+              smooth:
+                document.documentElement.classList.contains("lenis-scrolling"),
+            }));
+            await page.waitForTimeout(200);
+            const later = await page.evaluate(() => scrollY);
+            return !at.smooth && at.y === later;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe(true);
+    }
+
+    /**
+     * rAF calls in 2 s, 2.5 s from now; counted again if an effect was still
+     * in progress (see above). Fails if the page never comes to rest.
+     */
+    async function framesAtRest(page: Page, label: string) {
+      const clock = () => page.evaluate(() => performance.now());
+      await page.waitForTimeout(2500);
+      for (let attempt = 1; ; attempt++) {
+        const from = await clock();
+        const before = await page.evaluate(
+          () => (window as Window & { __rest?: Rest }).__rest!.rafCalls,
         );
-      const before = await calls();
-      await page.waitForTimeout(2000);
-      const during = (await calls()) - before;
-      console.log(`${path} ${label}: ${during} rAF calls at rest in 2 s`);
-      return during;
+        await page.waitForTimeout(2000);
+        const to = await clock();
+        const { during, moves, star } = await page.evaluate(
+          ([a, b, n]) => {
+            const r = (window as Window & { __rest?: Rest }).__rest!;
+            return {
+              during: r.rafCalls - n!,
+              moves: r.moves.filter((t) => t >= a! && t <= b!).length,
+              star: r.stars.some(([s, e]) => s < b! && e > a!),
+            };
+          },
+          [from - 50, to, before],
+        );
+        const busy = moves > 0 || star;
+        console.log(
+          `${path} ${label}: ${during} rAF calls at rest in 2 s` +
+            (busy
+              ? ` (in progress: ${star ? "a shooting star" : `${moves} moves`}; again)`
+              : ""),
+        );
+        if (busy && attempt < 3) {
+          // A new period of rest, so Mac's rest line (8 s without
+          // interaction, RF-27) does not fall in the next count either.
+          await page.keyboard.press("Shift");
+          await page.waitForTimeout(2500);
+          continue;
+        }
+        expect(star, `${label}: a shooting star each time`).toBe(false);
+        expect(moves, `${label}: never at rest`).toBe(0);
+        return during;
+      }
     }
 
     for (const item of CASES) {
@@ -969,10 +1059,9 @@ for (const { path } of homePages) {
           page,
         }) => {
           await start(page, item);
-          // Let the start of the layer settle (the first shooting star never
-          // comes before 8 s).
-          await page.waitForTimeout(2500);
-          expect(await framesIn2s(page, item.name)).toBeLessThanOrEqual(2);
+          // Counted once the start of the layer has settled (2.5 s; the first
+          // shooting star never comes before 8 s).
+          expect(await framesAtRest(page, item.name)).toBeLessThanOrEqual(2);
         });
 
         test("at most 2 in 2 s, 2.5 s after a wheel scroll", async ({
@@ -984,9 +1073,11 @@ for (const { path } of homePages) {
           await expect
             .poll(() => page.evaluate(() => window.scrollY))
             .toBeGreaterThan(100);
-          await page.waitForTimeout(2500);
+          // With a busy CPU the smooth scroll itself can last 2 s or more:
+          // 2.5 s from its end.
+          await scrollEnded(page);
           expect(
-            await framesIn2s(page, `${item.name}, after a wheel scroll`),
+            await framesAtRest(page, `${item.name}, after a wheel scroll`),
           ).toBeLessThanOrEqual(2);
         });
 
@@ -1011,9 +1102,8 @@ for (const { path } of homePages) {
             SERVICES[LAST]!.id,
           );
           await expect.poll(opacity).toBe(1);
-          await page.waitForTimeout(2500);
           expect(
-            await framesIn2s(page, `${item.name}, after a reveal and a move`),
+            await framesAtRest(page, `${item.name}, after a reveal and a move`),
           ).toBeLessThanOrEqual(2);
         });
       });

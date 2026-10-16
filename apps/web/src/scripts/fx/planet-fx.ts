@@ -24,8 +24,7 @@ import {
   type Point,
 } from "../../lib/sky/parallax";
 import type { Rng } from "../../lib/sky/rng";
-import { cssVariableName } from "../../styles/tokens";
-import type { FxCanvas, Painter } from "./canvas";
+import { toneValues, type FxCanvas, type Painter } from "./canvas";
 
 // The planets and the cursor (spec 005, RF-13, RF-14). Only with a fine
 // pointer in the middle or high class (fx-layer decides). Each planet moves
@@ -60,15 +59,6 @@ type Planet = {
 
 /** Below this the scale counts as arrived. */
 const SCALE_EPSILON = 0.0005;
-
-/** Values of the spark tokens as the canvas writes them. */
-function toneValues(ctx: CanvasRenderingContext2D): string[] {
-  const style = getComputedStyle(document.documentElement);
-  return SPARK_TONES.map((tone) => {
-    ctx.fillStyle = style.getPropertyValue(cssVariableName(tone)).trim();
-    return String(ctx.fillStyle);
-  });
-}
 
 export function planetFx(options: {
   canvas: FxCanvas | null;
@@ -156,7 +146,7 @@ export function planetFx(options: {
     draw(ctx, now, mark) {
       const dt = sparkLast ? Math.min(50, now - sparkLast) : 16;
       sparkLast = now;
-      if (!tones) tones = toneValues(ctx);
+      if (!tones) tones = toneValues(ctx, SPARK_TONES);
       let busy = false;
       for (const p of planets) {
         const pool = p.sparks;
@@ -172,7 +162,9 @@ export function planetFx(options: {
               y: box.top + box.height / 2,
             };
             const radius = box.width * SPARK_RIM_RATIO;
-            for (let n = 0; n < out.count; n++) {
+            // Never past the class limit, with Mac's bursts alive too.
+            const count = Math.min(out.count, canvas?.room() ?? 0);
+            for (let n = 0; n < count; n++) {
               const { origin, velocity } = sparkLaunch(rng, centre, radius);
               const tone = Math.floor(rng() * tones.length);
               spawn(pool, "spark", origin, velocity, rng, { max: cap }, tone);

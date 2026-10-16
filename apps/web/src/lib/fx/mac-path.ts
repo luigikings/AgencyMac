@@ -145,3 +145,20 @@ export function flightTilt(c: Curve, t: number, startTilt: number): number {
   const tilt = startTilt + (target - startTilt) * blend;
   return Math.max(-MAC_MAX_TILT_DEG, Math.min(MAC_MAX_TILT_DEG, tilt));
 }
+
+/**
+ * Point `distance` px behind `centre` when flying towards `headingDeg`
+ * (screen axes): where Mac's trail comes out (RF-23).
+ */
+export function rearOf(
+  centre: Point,
+  headingDeg: number,
+  distance: number,
+): Point {
+  if (distance === 0) return { ...centre };
+  const rad = (headingDeg * Math.PI) / 180;
+  return {
+    x: centre.x - Math.cos(rad) * distance,
+    y: centre.y - Math.sin(rad) * distance,
+  };
+}

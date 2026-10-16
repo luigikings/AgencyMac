@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sky/rng";
 import {
+  BURST_SPEED_PX_MS,
   PARTICLE_LIFE_MAX_MS,
+  PARTICLE_LIFE_MS,
   SPARK_FILL_MS,
   SPARK_SPEED_PX_MS,
   TIER_PARAMS,
+  TRAIL_JITTER_PX,
+  TRAIL_SPEED_PX_MS,
+  TRAIL_SPREAD_DEG,
 } from "./fx-config";
 import {
   alphaAt,
+  burstLaunch,
   capFor,
   createPool,
   emitRate,
@@ -16,6 +22,9 @@ import {
   sparksToEmit,
   spawn,
   step,
+  trailCap,
+  trailDue,
+  trailLaunch,
 } from "./particles";
 
 const rng = () => 0.5;
@@ -249,5 +258,121 @@ describe("sparksToEmit (RF-14)", () => {
     const second = sparksToEmit(first.carry, half, 40, 0);
     expect(second.count).toBe(1);
     expect(second.carry).toBeCloseTo(0, 5);
+  });
+});
+
+describe("trailCap (RF-23, RF-37)", () => {
+  it("holds a whole trail: every particle emitted lives its life", () => {
+    for (const tier of ["low", "mid", "high"] as const) {
+      const lifeMax = PARTICLE_LIFE_MS.trail[1];
+      expect(trailCap(tier)).toBeGreaterThanOrEqual(
+        Math.ceil((TIER_PARAMS[tier].trailPerSecond * lifeMax) / 1000) + 1,
+      );
+    }
+  });
+
+  it("with the sparks of the three planets stays under the tier's limit", () => {
+    for (const tier of ["low", "mid", "high"] as const) {
+      expect(trailCap(tier) + 3 * sparkCap(tier)).toBeLessThanOrEqual(
+        capFor(tier),
+      );
+    }
+  });
+
+  it("is 0 with no effects", () => {
+    expect(trailCap("off")).toBe(0);
+  });
+});
+
+describe("trailDue (RF-23)", () => {
+  it("is one particle at take-off and the rate per second after it", () => {
+    for (const rate of [8, 20, 36]) {
+      expect(trailDue(0, rate)).toBe(1);
+      expect(trailDue(1000, rate)).toBe(rate + 1);
+      expect(trailDue(500, rate)).toBe(Math.floor(rate / 2) + 1);
+    }
+  });
+
+  it("never falls behind the rate, whatever the frames", () => {
+    for (const rate of [8, 20, 36]) {
+      for (let ms = 0; ms <= 1600; ms += 7) {
+        expect(trailDue(ms, rate)).toBeGreaterThanOrEqual((rate * ms) / 1000);
+        expect(trailDue(ms, rate)).toBeLessThanOrEqual((rate * ms) / 1000 + 1);
+      }
+    }
+  });
+
+  it("grows with time and never goes back", () => {
+    let before = 0;
+    for (let ms = 0; ms <= 1000; ms += 13) {
+      const due = trailDue(ms, 36);
+      expect(due).toBeGreaterThanOrEqual(before);
+      before = due;
+    }
+  });
+
+  it("is nothing with no rate, and the first one with no time", () => {
+    expect(trailDue(1000, 0)).toBe(0);
+    expect(trailDue(-50, 36)).toBe(1);
+    expect(trailDue(Number.NaN, 36)).toBe(1);
+  });
+});
+
+describe("trailLaunch (RF-23)", () => {
+  const rear = { x: 400, y: 300 };
+
+  it("starts near Mac's rear and drifts away behind him", () => {
+    for (const heading of [0, 45, 90, 180, -120]) {
+      for (const value of [0, 0.25, 0.5, 0.75, 0.999]) {
+        const { origin, velocity } = trailLaunch(() => value, rear, heading);
+        expect(
+          Math.hypot(origin.x - rear.x, origin.y - rear.y),
+        ).toBeLessThanOrEqual(TRAIL_JITTER_PX * Math.SQRT2 + 1e-9);
+        const speed = Math.hypot(velocity.x, velocity.y);
+        expect(speed).toBeGreaterThanOrEqual(TRAIL_SPEED_PX_MS[0] - 1e-9);
+        expect(speed).toBeLessThanOrEqual(TRAIL_SPEED_PX_MS[1] + 1e-9);
+        // Against the direction of flight, within the spread.
+        const rad = (heading * Math.PI) / 180;
+        const along =
+          (velocity.x * Math.cos(rad) + velocity.y * Math.sin(rad)) / speed;
+        expect(along).toBeLessThanOrEqual(
+          -Math.cos((TRAIL_SPREAD_DEG * Math.PI) / 180) + 1e-9,
+        );
+      }
+    }
+  });
+
+  it("is the same for the same generator", () => {
+    expect(trailLaunch(mulberry32(5), rear, 30)).toEqual(
+      trailLaunch(mulberry32(5), rear, 30),
+    );
+  });
+});
+
+describe("burstLaunch (RF-28, RF-29)", () => {
+  it("starts on a circle around Mac and flies straight out", () => {
+    const r = mulberry32(11);
+    const centre = { x: 300, y: 200 };
+    for (let i = 0; i < 200; i++) {
+      const { origin, velocity } = burstLaunch(r, centre, 40);
+      const dx = origin.x - centre.x;
+      const dy = origin.y - centre.y;
+      expect(Math.hypot(dx, dy)).toBeCloseTo(40, 6);
+      const speed = Math.hypot(velocity.x, velocity.y);
+      expect(speed).toBeGreaterThanOrEqual(BURST_SPEED_PX_MS[0] - 1e-9);
+      expect(speed).toBeLessThanOrEqual(BURST_SPEED_PX_MS[1] + 1e-9);
+      // Outwards: the same direction as from the centre to the origin.
+      expect(velocity.x * dx + velocity.y * dy).toBeGreaterThan(0);
+    }
+  });
+
+  it("spreads all around", () => {
+    const r = mulberry32(2);
+    const quadrants = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      const { velocity } = burstLaunch(r, at, 10);
+      quadrants.add(`${velocity.x > 0}${velocity.y > 0}`);
+    }
+    expect(quadrants.size).toBe(4);
   });
 });

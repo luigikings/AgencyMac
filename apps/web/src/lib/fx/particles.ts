@@ -4,6 +4,7 @@
 
 import { range, type Rng } from "../sky/rng";
 import {
+  BURST_SPEED_PX_MS,
   PARTICLE_GRAVITY,
   PARTICLE_KINDS,
   PARTICLE_LIFE_MS,
@@ -12,6 +13,9 @@ import {
   SPARK_SPEED_PX_MS,
   TIER_PARAMS,
   TRAIL_FULL_RATE_SPEED_PX_S,
+  TRAIL_JITTER_PX,
+  TRAIL_SPEED_PX_MS,
+  TRAIL_SPREAD_DEG,
   type FxTier,
   type ParticleKind,
 } from "./fx-config";
@@ -61,6 +65,17 @@ export function capFor(tier: FxTier): number {
 /** Most sparks alive at once on one planet in the tier (RF-14). */
 export function sparkCap(tier: FxTier): number {
   return TIER_PARAMS[tier].sparksPerPlanet;
+}
+
+/**
+ * Size of the pool of Mac's trail (RF-23): room for every particle emitted
+ * during the longest life, so none is cut short. With the sparks of the three
+ * planets it stays under the tier's limit (RF-37).
+ */
+export function trailCap(tier: FxTier): number {
+  const rate = TIER_PARAMS[tier].trailPerSecond;
+  if (rate <= 0) return 0;
+  return Math.ceil((rate * PARTICLE_LIFE_MS.trail[1]) / 1000) + 2;
 }
 
 const TRAIL = PARTICLE_KINDS.indexOf("trail");
@@ -172,6 +187,26 @@ export function sparkLaunch(
 }
 
 /**
+ * Where a particle of one of Mac's bursts starts and how it flies (RF-28,
+ * RF-29): on a circle of `radius` around his centre, at a random angle,
+ * straight out at a speed in BURST_SPEED_PX_MS.
+ */
+export function burstLaunch(
+  rng: Rng,
+  centre: Point,
+  radius: number,
+): { origin: Point; velocity: Point } {
+  const angle = range(rng, 0, 2 * Math.PI);
+  const speed = range(rng, BURST_SPEED_PX_MS[0], BURST_SPEED_PX_MS[1]);
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  return {
+    origin: { x: centre.x + dx * radius, y: centre.y + dy * radius },
+    velocity: { x: dx * speed, y: dy * speed },
+  };
+}
+
+/**
  * Sparks a planet under the cursor gives off in `dtMs` (RF-14): at the rate
  * that fills `cap` in SPARK_FILL_MS, never past `cap` alive. `carry` is the
  * fraction left from the frames before; when the cap stops the emission the
@@ -209,4 +244,40 @@ export function emitRate(
   if (kind !== "trail" || !(speed > 0)) return 0;
   const full = TIER_PARAMS[tier].trailPerSecond;
   return full * Math.min(1, speed / TRAIL_FULL_RATE_SPEED_PX_S);
+}
+
+/**
+ * Trail particles due `elapsedMs` after take-off at `perSecond` (RF-23): one
+ * at once and then the rate, counted from the take-off itself and not from
+ * the frames, so slow or skipped frames never lower the rate.
+ */
+export function trailDue(elapsedMs: number, perSecond: number): number {
+  if (!(perSecond > 0)) return 0;
+  const ms = elapsedMs > 0 ? elapsedMs : 0;
+  return 1 + Math.floor((perSecond * ms) / 1000);
+}
+
+/**
+ * Where a trail particle starts and how it drifts (RF-23): a few px around
+ * Mac's rear, slowly backwards from `headingDeg` (his direction of flight),
+ * within TRAIL_SPREAD_DEG either side.
+ */
+export function trailLaunch(
+  rng: Rng,
+  rear: Point,
+  headingDeg: number,
+): { origin: Point; velocity: Point } {
+  const origin = {
+    x: rear.x + range(rng, -TRAIL_JITTER_PX, TRAIL_JITTER_PX),
+    y: rear.y + range(rng, -TRAIL_JITTER_PX, TRAIL_JITTER_PX),
+  };
+  const angle =
+    ((headingDeg + 180 + range(rng, -TRAIL_SPREAD_DEG, TRAIL_SPREAD_DEG)) *
+      Math.PI) /
+    180;
+  const speed = range(rng, TRAIL_SPEED_PX_MS[0], TRAIL_SPEED_PX_MS[1]);
+  return {
+    origin,
+    velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+  };
 }

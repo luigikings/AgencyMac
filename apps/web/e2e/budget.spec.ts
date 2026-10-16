@@ -82,6 +82,88 @@ for (const { path, locale } of homePages) {
       );
       expect(worst).toBeLessThanOrEqual(MAX_INTERACTION_MS);
     });
+
+    // Spec 005, RNF-4 and T22: the presses that set off Mac's bursts and turbo
+    // mode (RF-28, RF-29), with the mouse and then, once the 10 s cooldown is
+    // over, with the keyboard, in the high class.
+    test("no interaction takes more than 200 ms with Mac's bursts and turbo mode", async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(60_000);
+      await page.addInitScript(() => {
+        const w = window as unknown as { __events: Recorded[] };
+        w.__events = [];
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const e = entry as PerformanceEntry & { interactionId: number };
+            w.__events.push({
+              name: e.name,
+              duration: e.duration,
+              id: e.interactionId,
+            });
+          }
+        }).observe({
+          type: "event",
+          durationThreshold: 16,
+          buffered: true,
+        } as PerformanceObserverInit);
+        const proto = Navigator.prototype;
+        Object.defineProperty(proto, "hardwareConcurrency", {
+          configurable: true,
+          get: () => 8,
+        });
+        Object.defineProperty(proto, "deviceMemory", {
+          configurable: true,
+          get: () => 8,
+        });
+      });
+      await page.goto(path);
+      await page.waitForSelector('html[data-fx="on"]', { timeout: 10_000 });
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-fx-tier",
+        "high",
+      );
+      const mac = page.locator(".hero__mac");
+      await page.waitForTimeout(2_500);
+      const box = (await mac.boundingBox())!;
+      const turbo = async (press: () => Promise<void>) => {
+        for (let i = 0; i < 5; i++) {
+          await press();
+          if (i < 4) await page.waitForTimeout(250);
+        }
+        await expect(mac).toHaveAttribute("data-mac-turbo", "playing", {
+          timeout: 500,
+        });
+        // A press while he crosses the window, too.
+        await page.waitForTimeout(400);
+        await press();
+        await expect(mac).not.toHaveAttribute("data-mac-turbo", /.*/, {
+          timeout: 1_400,
+        });
+      };
+      const started = Date.now();
+      await turbo(() =>
+        page.mouse.click(box.x + box.width / 2, box.y + box.height / 2),
+      );
+      await page.waitForTimeout(Math.max(0, 10_300 - (Date.now() - started)));
+      await mac.focus();
+      await turbo(() => page.keyboard.press("Enter"));
+      await page.waitForTimeout(500);
+
+      const events = await page.evaluate(
+        () => (window as unknown as { __events: Recorded[] }).__events,
+      );
+      const interactions = events.filter((e) => e.id > 0);
+      const worst = Math.max(0, ...interactions.map((e) => e.duration));
+      testInfo.annotations.push({
+        type: "max-interaction-ms",
+        description: String(worst),
+      });
+      console.log(
+        `${path} max interaction with bursts and turbo: ${worst} ms (${interactions.length} events)`,
+      );
+      expect(worst).toBeLessThanOrEqual(MAX_INTERACTION_MS);
+    });
   });
 }
 
