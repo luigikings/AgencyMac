@@ -1,3 +1,4 @@
+import { nextCosts, shouldDegrade, tierDown } from "../../lib/fx/device-tier";
 import { TIER_PARAMS, type FxTier } from "../../lib/fx/fx-config";
 import { FINE_POINTER_QUERY } from "../../lib/motion/motion-config";
 import { scrollParallax } from "../../lib/sky/parallax";
@@ -6,6 +7,7 @@ import type { Traveler } from "../motion/home-motion";
 import type { ScrollHub } from "../motion/scroll-hub";
 import { createBubbles } from "./bubbles";
 import { createFxCanvas, type FxCanvas } from "./canvas";
+import { cursorTrail, type CursorReport } from "./cursor-trail";
 import {
   macBursts,
   macFlight,
@@ -13,6 +15,8 @@ import {
   type BurstReport,
   type TrailReport,
 } from "./mac-fx";
+import { hyperjump, type JumpReport } from "./hyperjump";
+import { journey } from "./journey";
 import { planetFx } from "./planet-fx";
 import { shootingStars } from "./shooting-stars";
 
@@ -101,8 +105,49 @@ function pauseWhenHidden(hooks: Hooks): Cleanup {
   };
 }
 
+/**
+ * Starts the effects of the tier and watches their own cost per frame
+ * (RF-38): over DEGRADE_LIMIT_MS on average for DEGRADE_WINDOW_FRAMES frames
+ * in a row, every effect is removed and started again one class down, with
+ * its limits at once (`data-fx-tier` changes). It never goes back up during
+ * the visit. Returns the function that removes whatever is running.
+ */
+export function startFx(tier: FxTier, core: FxCore): Cleanup {
+  const root = document.documentElement;
+  let current = tier;
+  let costs: number[] = [];
+  let timer = 0;
+  let stop: Cleanup = () => {};
+  const onFrame = (costMs: number, goesOn: boolean) => {
+    if (timer) return;
+    const recent = nextCosts(costs, costMs, true);
+    costs = goesOn ? recent : [];
+    const lower = tierDown(current);
+    if (lower === current || !shouldDegrade(recent)) return;
+    // Out of the frame being drawn: the canvas itself is replaced.
+    timer = window.setTimeout(() => {
+      timer = 0;
+      costs = [];
+      stop();
+      current = lower;
+      root.dataset.fxTier = lower;
+      stop = startTier(lower, core, onFrame);
+    });
+  };
+  stop = startTier(tier, core, onFrame);
+  return () => {
+    window.clearTimeout(timer);
+    timer = 0;
+    stop();
+  };
+}
+
 /** Starts the effects of the tier; returns the function that removes them. */
-export function startFx(tier: FxTier, { hub, traveler }: FxCore): Cleanup {
+function startTier(
+  tier: FxTier,
+  { hub, traveler }: FxCore,
+  onFrame: (costMs: number, goesOn: boolean) => void,
+): Cleanup {
   const root = document.documentElement;
   const params = TIER_PARAMS[tier];
   const hooks: Hooks = { onHide: [], onShow: [] };
@@ -112,10 +157,16 @@ export function startFx(tier: FxTier, { hub, traveler }: FxCore): Cleanup {
     pauseOffscreen(),
     pauseWhenHidden(hooks),
     starParallax(hub, params.scrollParallaxLayers),
+    // RF-30: the journey indicator, in every class.
+    journey(hub),
   ];
   // Without 2D drawing there is no canvas, and the effects drawn on it are
   // simply left out (RF-41).
-  const canvas = createFxCanvas(params.canvasDensity, params.maxParticles);
+  const canvas = createFxCanvas(
+    params.canvasDensity,
+    params.maxParticles,
+    onFrame,
+  );
   if (canvas) hooks.onHide.push(canvas.halt);
   // RF-27: Mac's single bubble. It goes with the tab hidden or a new layout
   // (its place was measured on the old one).
@@ -157,10 +208,25 @@ export function startFx(tier: FxTier, { hub, traveler }: FxCore): Cleanup {
   if (finePointer) {
     cleanups.push(planetFx({ canvas, tier, rng, hooks }));
   }
+  // RF-32: the cursor trail (high class with a fine pointer).
+  const cursor =
+    canvas && finePointer ? cursorTrail({ canvas, tier, rng }) : null;
+  if (cursor) cleanups.push(cursor.stop);
+  // RF-31: the space jump on the links to a section (middle and high class).
+  const jump = canvas ? hyperjump({ canvas, tier, rng, hub }) : null;
+  if (jump) cleanups.push(jump.stop);
   if (canvas) {
     cleanups.push(shootingStars({ canvas, tier, rng, hooks }), canvas.stop);
   }
-  cleanups.push(frameReport(canvas, trail, bursts?.report ?? null));
+  cleanups.push(
+    frameReport(
+      canvas,
+      trail,
+      bursts?.report ?? null,
+      jump?.report ?? null,
+      cursor?.report ?? null,
+    ),
+  );
   root.dataset.fx = "on";
 
   return () => {
@@ -182,12 +248,19 @@ function visitSeed(): number {
 // (data-fx-frames, data-fx-frame-avg, data-fx-frame-p95, data-fx-particles),
 // and Mac's trail: particles emitted so far and alive now
 // (data-fx-trail-emitted, data-fx-trail-alive), and Mac's bursts: particles
-// emitted so far and alive now (data-fx-burst-emitted, data-fx-burst-alive).
+// emitted so far and alive now (data-fx-burst-emitted, data-fx-burst-alive),
+// and the last space jump: most streaks at once and the least and most length
+// over speed of the streaks below the cap (data-fx-jump-streaks,
+// data-fx-jump-ratio-min, data-fx-jump-ratio-max), and the cursor trail:
+// particles emitted so far and alive now (data-fx-cursor-emitted,
+// data-fx-cursor-alive).
 // Only the tests ask for it.
 function frameReport(
   canvas: FxCanvas | null,
   trail: (() => TrailReport) | null,
   bursts: (() => BurstReport) | null,
+  jump: (() => JumpReport) | null,
+  cursor: (() => CursorReport) | null,
 ): Cleanup {
   const root = document.documentElement;
   const write = () => {
@@ -207,6 +280,13 @@ function frameReport(
     const burst = bursts?.() ?? { emitted: 0, alive: 0 };
     root.dataset.fxBurstEmitted = String(burst.emitted);
     root.dataset.fxBurstAlive = String(burst.alive);
+    const leap = jump?.() ?? { streaks: 0, ratioMin: 0, ratioMax: 0 };
+    root.dataset.fxJumpStreaks = String(leap.streaks);
+    root.dataset.fxJumpRatioMin = String(leap.ratioMin);
+    root.dataset.fxJumpRatioMax = String(leap.ratioMax);
+    const trace = cursor?.() ?? { emitted: 0, alive: 0 };
+    root.dataset.fxCursorEmitted = String(trace.emitted);
+    root.dataset.fxCursorAlive = String(trace.alive);
   };
   document.addEventListener("fx:report", write);
   return () => {
@@ -219,5 +299,10 @@ function frameReport(
     delete root.dataset.fxTrailAlive;
     delete root.dataset.fxBurstEmitted;
     delete root.dataset.fxBurstAlive;
+    delete root.dataset.fxJumpStreaks;
+    delete root.dataset.fxJumpRatioMin;
+    delete root.dataset.fxJumpRatioMax;
+    delete root.dataset.fxCursorEmitted;
+    delete root.dataset.fxCursorAlive;
   };
 }

@@ -332,3 +332,31 @@ export const JUMP_FULL_SPEED_PX_S = 2000;
 /** Streak length in px per px/s of speed, and the longest streak. */
 export const STREAK_LENGTH_PER_SPEED = 0.05;
 export const STREAK_MAX_LENGTH_PX = 400;
+
+// Journey indicator (RF-30).
+/** From this width the rail is vertical on the right edge; below, a bar along the top. */
+export const JOURNEY_WIDE_QUERY = "(min-width: 64rem)";
+/** Thickness of the whole bar on narrow screens, rocket and stops included, in px. */
+export const JOURNEY_MOBILE_PX = 6;
+/** Size of the rocket (the isologo) on narrow and wide screens, in px. */
+export const JOURNEY_ROCKET_PX = { narrow: 6, wide: 24 } as const;
+/** A stop is reached when its section's top crosses this part of the window (0 top, 1 bottom). */
+export const JOURNEY_STOP_MARK = 0.5;
+/** Width of a streak, in px (thin: RNF-10, at most 25 % of the window covered). */
+export const JUMP_STREAK_WIDTH_PX = 1.2;
+/** Opacity of the streaks at the peak of the jump. */
+export const JUMP_ALPHA = 0.55;
+/** The streaks drift against the scroll by this part of it (depth). */
+export const JUMP_DRIFT_RATIO = 0.35;
+
+// Cursor trail (RF-32): high class with a fine pointer only (cursorTrailMax).
+/** The cursor leaves a particle every this many px it travels. */
+export const CURSOR_TRAIL_SPACING_PX = 14;
+/** Colours of the cursor trail (token names: the canvas reads them). */
+export const CURSOR_TRAIL_TONES: readonly ColorName[] = [
+  "buttonHover",
+  "logoGradient1",
+  "text",
+];
+/** [min, max) drift speed of a trail particle, in px per ms. */
+export const CURSOR_TRAIL_SPEED_PX_MS = [0.005, 0.02] as const;

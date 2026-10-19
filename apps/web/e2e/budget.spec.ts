@@ -164,6 +164,100 @@ for (const { path, locale } of homePages) {
       );
       expect(worst).toBeLessThanOrEqual(MAX_INTERACTION_MS);
     });
+
+    // Spec 005, RNF-4 and T25: the links that set off the space jump
+    // (RF-31): "Descubre cómo", a link of the navigation and "Quiero
+    // despegar", with the mouse and the keyboard, in the high class.
+    test("no interaction takes more than 200 ms with the space jump", async ({
+      page,
+    }, testInfo) => {
+      await page.addInitScript(() => {
+        const w = window as unknown as {
+          __events: Recorded[];
+          __jumps: number;
+        };
+        w.__events = [];
+        w.__jumps = 0;
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const e = entry as PerformanceEntry & { interactionId: number };
+            w.__events.push({
+              name: e.name,
+              duration: e.duration,
+              id: e.interactionId,
+            });
+          }
+        }).observe({
+          type: "event",
+          durationThreshold: 16,
+          buffered: true,
+        } as PerformanceObserverInit);
+        // <html> may not exist yet: watch the whole document.
+        new MutationObserver((records) => {
+          for (const record of records) {
+            const el = record.target as Element;
+            if (el.getAttribute("data-jump") === "playing") w.__jumps++;
+          }
+        }).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["data-jump"],
+        });
+        const proto = Navigator.prototype;
+        Object.defineProperty(proto, "hardwareConcurrency", {
+          configurable: true,
+          get: () => 8,
+        });
+        Object.defineProperty(proto, "deviceMemory", {
+          configurable: true,
+          get: () => 8,
+        });
+      });
+      await page.goto(path);
+      await page.waitForSelector('html[data-fx="on"]', { timeout: 10_000 });
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-fx-tier",
+        "high",
+      );
+      await expect(page.locator("html.lenis")).toHaveCount(1, {
+        timeout: 5000,
+      });
+      const jumps = () =>
+        page.evaluate(() => (window as unknown as { __jumps: number }).__jumps);
+      const links = [
+        page.locator("a.hero__discover"),
+        page.locator('.site-header__nav a[href="#team"]'),
+        page.getByRole("link", { name: t(locale, "cta.takeOff") }).first(),
+      ];
+      let expected = 0;
+      for (const link of links) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForTimeout(300);
+        await link.click();
+        await expect.poll(jumps).toBe(++expected);
+        await page.waitForTimeout(1500);
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(300);
+      await page.locator("a.hero__discover").focus();
+      await page.keyboard.press("Enter");
+      await expect.poll(jumps).toBe(++expected);
+      await page.waitForTimeout(1500);
+
+      const events = await page.evaluate(
+        () => (window as unknown as { __events: Recorded[] }).__events,
+      );
+      const interactions = events.filter((e) => e.id > 0);
+      const worst = Math.max(0, ...interactions.map((e) => e.duration));
+      testInfo.annotations.push({
+        type: "max-interaction-ms",
+        description: String(worst),
+      });
+      console.log(
+        `${path} max interaction with the space jump: ${worst} ms (${interactions.length} events)`,
+      );
+      expect(worst).toBeLessThanOrEqual(MAX_INTERACTION_MS);
+    });
   });
 }
 

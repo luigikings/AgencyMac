@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DEGRADE_WINDOW_FRAMES } from "./fx-config";
 import {
+  nextCosts,
   pickTier,
   shouldDegrade,
   tierDown,
@@ -102,5 +104,38 @@ describe("shouldDegrade (RF-38)", () => {
   it("accepts another window and limit", () => {
     expect(shouldDegrade(frames(10, 5), 10, 4)).toBe(true);
     expect(shouldDegrade(frames(9, 5), 10, 4)).toBe(false);
+  });
+});
+
+// Spec 005, T26: the costs the degradation looks at are those of frames in a
+// row ("45 fotogramas seguidos", RF-38): a pause of the canvas loop starts
+// the count again.
+describe("nextCosts (RF-38)", () => {
+  it("adds the cost of each frame while the loop goes on", () => {
+    expect(nextCosts([1, 2], 3, true)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps only the last frames of the window", () => {
+    let costs: number[] = [];
+    for (let i = 0; i < DEGRADE_WINDOW_FRAMES + 10; i++) {
+      costs = nextCosts(costs, i, true);
+    }
+    expect(costs).toHaveLength(DEGRADE_WINDOW_FRAMES);
+    expect(costs.at(-1)).toBe(DEGRADE_WINDOW_FRAMES + 9);
+  });
+
+  it("starts again when the loop stops", () => {
+    expect(nextCosts([20, 20, 20], 20, false)).toEqual([]);
+  });
+
+  it("44 slow frames, a pause and one more never degrade", () => {
+    let costs: number[] = [];
+    for (let i = 0; i < 44; i++) costs = nextCosts(costs, 20, i < 43);
+    costs = nextCosts(costs, 20, true);
+    expect(shouldDegrade(costs)).toBe(false);
+  });
+
+  it("does not keep a value that is not a cost", () => {
+    expect(nextCosts([1], Number.NaN, true)).toEqual([1]);
   });
 });

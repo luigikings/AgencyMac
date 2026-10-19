@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { keepTicking, needsResync, nextIdleFrames } from "./smooth-loop";
+import {
+  keepTicking,
+  needsResync,
+  nextIdleFrames,
+  nextVelocity,
+  pxPerSecond,
+  velocityNow,
+} from "./smooth-loop";
+import { SCROLL_FRAME_MS, SCROLL_VELOCITY_MAX_AGE_MS } from "./motion-config";
 
 // Spec 005, D19 (plan 14.2): the smooth scrolling loop only runs while the
 // page moves, and stops after a few frames without movement (RF-39).
@@ -67,5 +75,51 @@ describe("resync of the smooth scrolling position", () => {
   it("never resyncs to a position that is not a number", () => {
     expect(needsResync(false, 0, Number.NaN)).toBe(false);
     expect(needsResync(false, Number.NaN, 300)).toBe(true);
+  });
+});
+
+// Spec 005, T25 (plan 14.6): the speed of the scroll for the space jump, from
+// Lenis while its loop runs and otherwise from the scroll handler's positions.
+describe("pxPerSecond", () => {
+  it("turns a step over a time into px per second", () => {
+    expect(pxPerSecond(100, 50)).toBe(2000);
+    expect(pxPerSecond(-30, 15)).toBe(-2000);
+  });
+
+  it("is 0 without time or with values that are not finite", () => {
+    expect(pxPerSecond(100, 0)).toBe(0);
+    expect(pxPerSecond(100, -5)).toBe(0);
+    expect(pxPerSecond(Number.NaN, 16)).toBe(0);
+    expect(pxPerSecond(10, Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+
+describe("nextVelocity", () => {
+  it("is 0 for the first position", () => {
+    expect(nextVelocity(null, 500, 1000)).toBe(0);
+  });
+
+  it("is the change of position over the time between two scroll events", () => {
+    expect(nextVelocity({ y: 0, t: 1000 }, 40, 1020)).toBe(2000);
+    expect(nextVelocity({ y: 400, t: 1000 }, 380, 1010)).toBe(-2000);
+  });
+
+  it("counts a jump after a still page as one frame (an instant jump is fast)", () => {
+    const v = nextVelocity({ y: 0, t: 0 }, 2000, 5000);
+    expect(v).toBeCloseTo((2000 / SCROLL_FRAME_MS) * 1000, 5);
+  });
+});
+
+describe("velocityNow", () => {
+  it("keeps the last speed while it is fresh", () => {
+    expect(velocityNow(1500, 1000, 1000 + SCROLL_VELOCITY_MAX_AGE_MS)).toBe(
+      1500,
+    );
+  });
+
+  it("is 0 once no scroll has come for a while", () => {
+    expect(velocityNow(1500, 1000, 1000 + SCROLL_VELOCITY_MAX_AGE_MS + 1)).toBe(
+      0,
+    );
   });
 });

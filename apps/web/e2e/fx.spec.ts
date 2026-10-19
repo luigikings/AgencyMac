@@ -95,6 +95,8 @@ async function frameReport(page: Page) {
       avg: Number(d.fxFrameAvg),
       p95: Number(d.fxFrameP95),
       particles: Number(d.fxParticles),
+      // The cursor trail (T26), drawn on the same canvas.
+      cursor: Number(d.fxCursorAlive) || 0,
     };
   });
 }
@@ -649,7 +651,11 @@ for (const { path } of homePages) {
           const start = performance.now();
           while (performance.now() - start < ms) {
             document.dispatchEvent(new Event("fx:report"));
-            particles = Math.max(particles, Number(root.dataset.fxParticles));
+            // Sparks only: the cursor trail (T26) follows the same mouse.
+            const sparks =
+              Number(root.dataset.fxParticles) -
+              (Number(root.dataset.fxCursorAlive) || 0);
+            particles = Math.max(particles, sparks);
             const t = getComputedStyle(el).transform;
             if (t !== "none") {
               const m = new DOMMatrix(t);
@@ -1106,6 +1112,36 @@ for (const { path } of homePages) {
             await framesAtRest(page, `${item.name}, after a reveal and a move`),
           ).toBeLessThanOrEqual(2);
         });
+
+        // T25: the space jump stops with its scroll (on the phone, the low
+        // class, there is no jump: the same link only scrolls).
+        test("at most 2 in 2 s, 2.5 s after a jump to a section", async ({
+          page,
+        }) => {
+          await start(page, item);
+          await page.locator("a.hero__discover").click();
+          await expect
+            .poll(() => page.evaluate(() => window.scrollY))
+            .toBeGreaterThan(100);
+          await scrollEnded(page);
+          await expect(page.locator("html[data-jump]")).toHaveCount(0);
+          expect(
+            await framesAtRest(page, `${item.name}, after a jump`),
+          ).toBeLessThanOrEqual(2);
+        });
+
+        // T26: the cursor trail (high class on the desktop) dies out on its
+        // own once the cursor stops.
+        test("at most 2 in 2 s, 2.5 s after the cursor stops", async ({
+          page,
+        }) => {
+          await start(page, item);
+          await page.mouse.move(60, 600);
+          await page.mouse.move(300, 640, { steps: 20 });
+          expect(
+            await framesAtRest(page, `${item.name}, after the cursor moved`),
+          ).toBeLessThanOrEqual(2);
+        });
       });
     }
   });
@@ -1365,7 +1401,9 @@ test.describe("frame cost of the effects", () => {
     let most = 0;
     const start = Date.now();
     while (Date.now() - start < 3000) {
-      most = Math.max(most, (await frameReport(page)).particles);
+      // Sparks only: the cursor trail (T26) follows the same mouse.
+      const r = await frameReport(page);
+      most = Math.max(most, r.particles - r.cursor);
       await page.waitForTimeout(100);
     }
     const report = await frameReport(page);
@@ -1379,3 +1417,938 @@ test.describe("frame cost of the effects", () => {
     expect(errors).toEqual([]);
   });
 });
+
+// Spec 005, T24: journey indicator (RF-30, RF-42, RNF-11). With animation, a
+// fixed rail on the edge of the window (a bar along the top on phones, at
+// most 6 px thick; vertical on the right from 64 rem) with one stop per
+// section and the isologo (`/favicon.svg`) as the rocket that travels with
+// the scroll, lighting the stops already reached. Decorative: hidden from
+// assistive technology, out of the way of the pointer, never over a text or
+// a button, and it does not exist without animation.
+const JOURNEY = "[data-fx-journey]";
+const SECTION_IDS = ["hero", "services", "projects", "team", "contact"];
+
+type Rect = { left: number; top: number; right: number; bottom: number };
+
+type JourneyState = {
+  orientation: string | undefined;
+  box: Rect;
+  rocket: Rect & { src: string; alt: string | null };
+  stops: { id: string | undefined; visited: boolean; box: Rect }[];
+  parts: Rect[];
+};
+
+function readJourney(page: Page): Promise<JourneyState> {
+  return page.locator(JOURNEY).evaluate((el) => {
+    const rect = (node: Element): Rect => {
+      const r = node.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    };
+    const rocket = el.querySelector<HTMLImageElement>("[data-journey-rocket]")!;
+    return {
+      orientation: (el as HTMLElement).dataset.orientation,
+      box: rect(el),
+      rocket: {
+        ...rect(rocket),
+        src: rocket.getAttribute("src") ?? "",
+        alt: rocket.getAttribute("alt"),
+      },
+      stops: [...el.querySelectorAll<HTMLElement>("[data-journey-stop]")].map(
+        (stop) => ({
+          id: stop.dataset.journeyStop,
+          visited: stop.hasAttribute("data-visited"),
+          box: rect(stop),
+        }),
+      ),
+      parts: [el, ...el.querySelectorAll("*")].map(rect),
+    };
+  });
+}
+
+/** Scroll positions where each section's top is at the top of the window. */
+function sectionStops(page: Page): Promise<number[]> {
+  return page.evaluate((ids) => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    return ids.map((id) => {
+      const top =
+        document.getElementById(id)!.getBoundingClientRect().top + scrollY;
+      return Math.min(max, Math.round(top));
+    });
+  }, SECTION_IDS);
+}
+
+async function restAt(page: Page, y: number | "end") {
+  await scrollToY(page, y);
+  // The indicator follows the scroll event; one more frame to be sure.
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => setTimeout(done))),
+  );
+  await page.waitForTimeout(100);
+}
+
+/** Texts and buttons of the page that a part of the indicator overlaps. */
+function coveredByJourney(page: Page): Promise<string[]> {
+  return page.evaluate((selector) => {
+    const journey = document.querySelector(selector)!;
+    const parts = [journey, ...journey.querySelectorAll("*")].map((el) =>
+      el.getBoundingClientRect(),
+    );
+    const width = document.documentElement.clientWidth;
+    const height = window.innerHeight;
+    const targets: { what: string; r: DOMRect }[] = [];
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    const range = document.createRange();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!node.nodeValue?.trim() || !parent) continue;
+      if (parent.closest("script, style, noscript, template, [aria-hidden]")) {
+        continue;
+      }
+      if (getComputedStyle(parent).visibility !== "visible") continue;
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects()) {
+        targets.push({ what: node.nodeValue.trim().slice(0, 30), r });
+      }
+    }
+    for (const el of document.querySelectorAll(
+      "a, button, [role='button'], .cta",
+    )) {
+      if (el.closest("[aria-hidden]")) continue;
+      const r = el.getBoundingClientRect();
+      targets.push({ what: `<${el.tagName.toLowerCase()}>`, r });
+    }
+    const covered: string[] = [];
+    for (const { what, r } of targets) {
+      if (r.width <= 1 || r.height <= 1) continue;
+      // Only what is whole in the window: a line the window edge already
+      // cuts (on its way out while scrolling) is not readable there anyway,
+      // and a fixed bar on that edge cannot avoid it at every position.
+      if (r.top < 0 || r.bottom > height || r.left < 0 || r.right > width) {
+        continue;
+      }
+      const hit = parts.some(
+        (p) =>
+          Math.min(p.right, r.right) - Math.max(p.left, r.left) > 0.5 &&
+          Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top) > 0.5,
+      );
+      if (hit) covered.push(`${what} at ${Math.round(r.top)}`);
+    }
+    return covered;
+  }, JOURNEY);
+}
+
+const JOURNEY_VIEWS = [
+  {
+    name: "desktop 1280 x 720, high class",
+    use: { viewport: { width: 1280, height: 720 } },
+    signals: { cores: 8, memory: 8 },
+    vertical: true,
+  },
+  {
+    name: "phone 375 x 667, low class",
+    use: {
+      viewport: { width: 375, height: 667 },
+      hasTouch: true,
+      isMobile: true,
+    },
+    signals: { cores: 8, memory: 8 },
+    vertical: false,
+  },
+  {
+    name: "phone 320 x 568, low class",
+    use: {
+      viewport: { width: 320, height: 568 },
+      hasTouch: true,
+      isMobile: true,
+    },
+    signals: { cores: 8, memory: 8 },
+    vertical: false,
+  },
+] as const;
+
+for (const { path } of homePages) {
+  test.describe(`${path}: journey indicator (RF-30)`, () => {
+    for (const view of JOURNEY_VIEWS) {
+      test.describe(view.name, () => {
+        test.use(view.use);
+
+        test("one decorative rail with 5 stops and the isologo as the rocket", async ({
+          page,
+        }) => {
+          await simulate(page, view.signals);
+          await page.goto(path);
+          await page.waitForSelector(FX_ON, { timeout: 10_000 });
+          const indicator = page.locator(JOURNEY);
+          await expect(indicator).toHaveCount(1);
+          await expect(indicator).toHaveAttribute("aria-hidden", "true");
+          const state = await readJourney(page);
+          expect(state.stops.map((s) => s.id)).toEqual(SECTION_IDS);
+          // The rocket is the isologo already served: no new image.
+          expect(state.rocket.src).toBe("/favicon.svg");
+          expect(state.rocket.alt).toBe("");
+          await expect
+            .poll(() =>
+              page
+                .locator(`${JOURNEY} [data-journey-rocket]`)
+                .evaluate((img) => (img as HTMLImageElement).naturalWidth),
+            )
+            .toBeGreaterThan(0);
+          const a11y = await indicator.evaluate((el) => ({
+            pointer: [el, ...el.querySelectorAll("*")].map(
+              (node) => getComputedStyle(node).pointerEvents,
+            ),
+            focusable: el.querySelectorAll(
+              "a, button, input, [tabindex], [contenteditable]",
+            ).length,
+            position: getComputedStyle(el).position,
+          }));
+          expect(new Set(a11y.pointer)).toEqual(new Set(["none"]));
+          expect(a11y.focusable).toBe(0);
+          expect(a11y.position).toBe("fixed");
+
+          const size = page.viewportSize()!;
+          const { box } = state;
+          if (view.vertical) {
+            expect(state.orientation).toBe("vertical");
+            expect(box.bottom - box.top).toBeGreaterThan(size.height / 2);
+            expect(box.right - box.left).toBeLessThanOrEqual(32);
+            expect(box.right).toBeLessThanOrEqual(size.width);
+            expect(box.right).toBeGreaterThan(size.width - 48);
+          } else {
+            expect(state.orientation).toBe("horizontal");
+            expect(box.top).toBe(0);
+            expect(box.bottom - box.top).toBeLessThanOrEqual(6);
+            expect(box.right - box.left).toBe(size.width);
+            // Every part, rocket and stops included, inside the 6 px.
+            for (const part of state.parts) {
+              expect(part.top).toBeGreaterThanOrEqual(box.top - 0.01);
+              expect(part.bottom).toBeLessThanOrEqual(box.bottom + 0.01);
+            }
+          }
+        });
+
+        test("the rocket advances with the scroll and lights the stops reached", async ({
+          page,
+        }) => {
+          await simulate(page, view.signals);
+          await page.goto(path);
+          await page.waitForSelector(FX_ON, { timeout: 10_000 });
+          await expect(page.locator(JOURNEY)).toHaveCount(1);
+          const along = (r: Rect) =>
+            view.vertical ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+          const start = (r: Rect) => (view.vertical ? r.top : r.left);
+          const end = (r: Rect) => (view.vertical ? r.bottom : r.right);
+
+          await restAt(page, 0);
+          const top = await readJourney(page);
+          expect(Math.abs(start(top.rocket) - start(top.box))).toBeLessThan(1);
+          expect(top.stops.map((s) => s.visited)).toEqual([
+            true,
+            false,
+            false,
+            false,
+            false,
+          ]);
+
+          const positions = await sectionStops(page);
+          let last = along(top.rocket);
+          for (let i = 1; i < positions.length; i++) {
+            await restAt(page, positions[i]!);
+            const state = await readJourney(page);
+            const visited = state.stops.map((s) => s.visited);
+            // The section at the top and every one before it are lit, and
+            // the lit stops are always the first ones.
+            expect(visited.slice(0, i + 1), `at section ${i}`).toEqual(
+              Array(i + 1).fill(true),
+            );
+            const firstUnlit = visited.indexOf(false);
+            if (firstUnlit !== -1) {
+              expect(visited.slice(firstUnlit)).not.toContain(true);
+            }
+            // A stop is lit once the rocket's centre has reached it.
+            const rocket = along(state.rocket);
+            for (const stop of state.stops) {
+              if (stop.visited) {
+                expect(along(stop.box)).toBeLessThanOrEqual(rocket + 1);
+              } else {
+                expect(along(stop.box)).toBeGreaterThan(rocket - 1);
+              }
+            }
+            expect(rocket).toBeGreaterThanOrEqual(last);
+            last = rocket;
+          }
+
+          await restAt(page, "end");
+          const bottom = await readJourney(page);
+          expect(Math.abs(end(bottom.rocket) - end(bottom.box))).toBeLessThan(
+            1,
+          );
+          expect(bottom.stops.every((s) => s.visited)).toBe(true);
+          // And back up: the stops behind the rocket go dark again.
+          await restAt(page, 0);
+          const back = await readJourney(page);
+          expect(back.stops.map((s) => s.visited)).toEqual(
+            top.stops.map((s) => s.visited),
+          );
+        });
+
+        test("covers no text or button, with no horizontal overflow", async ({
+          page,
+        }) => {
+          await simulate(page, view.signals);
+          await page.goto(path);
+          await page.waitForSelector(FX_ON, { timeout: 10_000 });
+          await expect(page.locator(JOURNEY)).toHaveCount(1);
+          const positions: (number | "end")[] = [
+            0,
+            ...(await sectionStops(page)),
+            "end",
+          ];
+          if (view.vertical) {
+            // The right edge stays clear all the way down.
+            const max = await page.evaluate(
+              () => document.documentElement.scrollHeight - innerHeight,
+            );
+            for (let i = 1; i < 12; i++) {
+              positions.push(Math.round((max * i) / 12));
+            }
+          }
+          for (const y of positions) {
+            await restAt(page, y);
+            expect(await coveredByJourney(page), `at ${y}`).toEqual([]);
+            const overflow = await page.evaluate(
+              () =>
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth,
+            );
+            expect(overflow, `overflow at ${y}`).toBeLessThanOrEqual(0);
+          }
+        });
+      });
+    }
+
+    test.describe("from 64 rem the rail is vertical", () => {
+      test.use({ viewport: { width: 1023, height: 768 } });
+
+      test("horizontal at 1023 px, vertical at 1024 px and back", async ({
+        page,
+      }) => {
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(path);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        const orientation = () =>
+          page.locator(JOURNEY).getAttribute("data-orientation");
+        await expect.poll(orientation).toBe("horizontal");
+        await page.setViewportSize({ width: 1024, height: 768 });
+        await expect.poll(orientation).toBe("vertical");
+        await expect
+          .poll(async () => (await readJourney(page)).box.right)
+          .toBeLessThanOrEqual(1024);
+        await page.setViewportSize({ width: 1023, height: 768 });
+        await expect.poll(orientation).toBe("horizontal");
+        await expect
+          .poll(async () => {
+            const { box } = await readJourney(page);
+            return [box.top, box.bottom - box.top <= 6];
+          })
+          .toEqual([0, true]);
+      });
+    });
+
+    test.describe("no layout shift", () => {
+      test.use({
+        viewport: { width: 375, height: 667 },
+        hasTouch: true,
+        isMobile: true,
+      });
+
+      test("adding the indicator and scrolling with it moves nothing", async ({
+        page,
+      }) => {
+        await page.addInitScript(() => {
+          const w = window as Window & { __shifts?: number[] };
+          w.__shifts = [];
+          new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              w.__shifts!.push(
+                (entry as PerformanceEntry & { value: number }).value,
+              );
+            }
+          }).observe({ type: "layout-shift", buffered: true });
+        });
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(path);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        await expect(page.locator(JOURNEY)).toHaveCount(1);
+        await restAt(page, 1200);
+        await restAt(page, 0);
+        const shifts = await page.evaluate(
+          () => (window as Window & { __shifts?: number[] }).__shifts!,
+        );
+        expect(shifts.reduce((sum, value) => sum + value, 0)).toBe(0);
+      });
+    });
+
+    test.describe("without animation (RF-40)", () => {
+      test.use({ viewport: { width: 1280, height: 720 } });
+
+      test("it never exists with reduced motion", async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(path);
+        await page.waitForTimeout(LOAD_DELAY_MS + 1500);
+        await expect(page.locator(JOURNEY)).toHaveCount(0);
+      });
+
+      test("it goes when motion becomes reduced mid-visit", async ({
+        page,
+      }) => {
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(path);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        await expect(page.locator(JOURNEY)).toHaveCount(1);
+        await restAt(page, 900);
+        const before = await page.evaluate(() => scrollY);
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await expect(page.locator(FX_ON)).toHaveCount(0);
+        await expect(page.locator(JOURNEY)).toHaveCount(0);
+        const after = await page.evaluate(() => scrollY);
+        expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
+      });
+    });
+  });
+}
+
+// Spec 005, T25: space jump (RF-31, RF-40, RNF-10). With animation and the
+// middle or high class, a link to a section (navigation, "Quiero despegar",
+// "Descubre cómo") sets off streaks of stars stretched along the scroll, as
+// long as its speed, for 0.9 s at most (`data-jump="playing"` on <html>
+// meanwhile), with 40 (middle) or 80 (high) streaks at most. The arrival at
+// the section is not delayed. No jump on loading with an anchor in the
+// address, in the low class or with reduced motion.
+type JumpMark = { value: string | null; t: number };
+
+/** Records every change of `data-jump` on <html> with performance.now. */
+async function logJumps(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as Window & { __jumps?: JumpMark[] };
+    w.__jumps = [];
+    // At this point <html> may not exist yet: watch the whole document.
+    new MutationObserver(() => {
+      const value = document.documentElement.getAttribute("data-jump");
+      const last = w.__jumps!.at(-1);
+      if (last?.value !== value) {
+        w.__jumps!.push({ value, t: performance.now() });
+      }
+    }).observe(document, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-jump"],
+    });
+  });
+}
+
+function jumpLog(page: Page): Promise<JumpMark[]> {
+  return page.evaluate(
+    () => (window as Window & { __jumps?: JumpMark[] }).__jumps ?? [],
+  );
+}
+
+/** The jump's report: most streaks at once and their length over speed. */
+function jumpReport(page: Page) {
+  return page.evaluate(() => {
+    document.dispatchEvent(new Event("fx:report"));
+    const d = document.documentElement.dataset;
+    return {
+      streaks: Number(d.fxJumpStreaks),
+      ratioMin: Number(d.fxJumpRatioMin),
+      ratioMax: Number(d.fxJumpRatioMax),
+    };
+  });
+}
+
+/**
+ * Clicks `link` and measures, from the click, when the section `id` reaches
+ * the top of the window (within 2 px; ms, performance.now).
+ */
+async function clickAndArrive(
+  page: Page,
+  link: string,
+  id: string,
+): Promise<{ clickAt: number; arriveMs: number }> {
+  await page.evaluate((target) => {
+    const w = window as Window & {
+      __clickAt?: number;
+      __arrival?: Promise<number>;
+    };
+    w.__arrival = new Promise((resolve) => {
+      addEventListener(
+        "click",
+        () => {
+          w.__clickAt = performance.now();
+          const limit = w.__clickAt + 8000;
+          const check = () => {
+            const top = document
+              .getElementById(target)!
+              .getBoundingClientRect().top;
+            const now = performance.now();
+            if (Math.abs(top) <= 2 || now > limit) resolve(now);
+            else requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        },
+        { capture: true, once: true },
+      );
+    });
+  }, id);
+  await page.locator(link).first().click();
+  return page.evaluate(async () => {
+    const w = window as Window & {
+      __clickAt?: number;
+      __arrival?: Promise<number>;
+    };
+    const at = await w.__arrival!;
+    return { clickAt: w.__clickAt!, arriveMs: at - w.__clickAt! };
+  });
+}
+
+const NAV_LINK = '.site-header__nav a[href="#projects"]';
+const DISCOVER = "a.hero__discover";
+const TAKE_OFF = "a.cta";
+
+const JUMP_CLASSES = [
+  { tier: "mid", signals: { cores: 4, memory: 8 }, max: 40 },
+  { tier: "high", signals: { cores: 8, memory: 8 }, max: 80 },
+] as const;
+
+for (const { path } of homePages) {
+  test.describe(`${path}: space jump (RF-31)`, () => {
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    for (const item of JUMP_CLASSES) {
+      test(`${item.tier} class: a jump of 0.9 s at most with ${item.max} streaks at most, as long as the speed, and the arrival is not delayed`, async ({
+        page,
+        browser,
+      }) => {
+        const errors = watchErrors(page);
+        await logJumps(page);
+        await simulate(page, item.signals);
+        await page.goto(`${path}?seed=${SEED}`);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        await expect(page.locator("html")).toHaveAttribute(
+          "data-fx-tier",
+          item.tier,
+        );
+        await expect(page.locator("html.lenis")).toHaveCount(1, {
+          timeout: 10_000,
+        });
+        await expect(page.locator("html[data-jump]")).toHaveCount(0);
+
+        const before = (await jumpLog(page)).length;
+        const { clickAt, arriveMs } = await clickAndArrive(
+          page,
+          NAV_LINK,
+          "projects",
+        );
+        await expect(page.locator("html[data-jump]")).toHaveCount(0, {
+          timeout: 3000,
+        });
+        const marks = (await jumpLog(page)).slice(before);
+        expect(marks.map((m) => m.value)).toEqual(["playing", null]);
+        // It starts with the click (its handler runs before the one that
+        // timestamps the click, so it may come a hair earlier) ...
+        expect(Math.abs(marks[0]!.t - clickAt)).toBeLessThan(100);
+        // ... and lasts 0.9 s at most (plus the frame that ends it).
+        expect(marks[1]!.t - marks[0]!.t).toBeLessThanOrEqual(900 + 50);
+        const report = await jumpReport(page);
+        console.log(
+          `${path} ${item.tier} jump: ${Math.round(marks[1]!.t - marks[0]!.t)} ms, ` +
+            `${report.streaks} streaks, length/speed ${report.ratioMin.toFixed(3)}-${report.ratioMax.toFixed(3)}, arrival ${Math.round(arriveMs)} ms`,
+        );
+        expect(report.streaks).toBeGreaterThan(0);
+        expect(report.streaks).toBeLessThanOrEqual(item.max);
+        // Length proportional to the speed: every streak below the cap is
+        // speed x STREAK_LENGTH_PER_SPEED x a jitter of 0.5 to 1.
+        expect(report.ratioMin).toBeGreaterThanOrEqual(0.5 - 1e-6);
+        expect(report.ratioMax).toBeLessThanOrEqual(1 + 1e-6);
+        expect(errors).toEqual([]);
+
+        // The same click without the effects module: the arrival takes as
+        // long (the jump never holds the scroll back).
+        const base = await browser.newPage({
+          viewport: { width: 1280, height: 720 },
+          reducedMotion: "no-preference",
+        });
+        await base.route(FX_CHUNK, (route) => route.abort());
+        await simulate(base, item.signals);
+        await base.goto(path);
+        await base.waitForSelector(MOTION, { timeout: 10_000 });
+        await expect(base.locator("html.lenis")).toHaveCount(1, {
+          timeout: 10_000,
+        });
+        await base.waitForTimeout(1500);
+        const baseline = await clickAndArrive(base, NAV_LINK, "projects");
+        await base.close();
+        console.log(
+          `${path} ${item.tier} arrival: ${Math.round(arriveMs)} ms with the jump, ${Math.round(baseline.arriveMs)} ms without effects`,
+        );
+        expect(arriveMs).toBeLessThan(8000);
+        expect(arriveMs).toBeLessThanOrEqual(
+          baseline.arriveMs + Math.max(250, baseline.arriveMs * 0.3),
+        );
+      });
+    }
+
+    test("high class: the navigation, “Quiero despegar” and “Descubre cómo” set it off", async ({
+      page,
+    }) => {
+      await logJumps(page);
+      await simulate(page, { cores: 8, memory: 8 });
+      await page.goto(path);
+      await page.waitForSelector(FX_ON, { timeout: 10_000 });
+      await expect(page.locator("html.lenis")).toHaveCount(1, {
+        timeout: 10_000,
+      });
+      for (const [link, id] of [
+        [DISCOVER, "services"],
+        [TAKE_OFF, "contact"],
+        [NAV_LINK, "projects"],
+      ] as const) {
+        await scrollToY(page, 0);
+        await page.waitForTimeout(300);
+        const before = (await jumpLog(page)).length;
+        await page.locator(link).first().click();
+        await expect
+          .poll(async () =>
+            (await jumpLog(page)).slice(before).map((m) => m.value),
+          )
+          .toEqual(["playing", null]);
+        // Arrived: the section at the top, or the end of the page when the
+        // section cannot reach the top (contact).
+        await expect
+          .poll(() =>
+            page.evaluate((target) => {
+              const top = document
+                .getElementById(target)!
+                .getBoundingClientRect().top;
+              const max =
+                document.documentElement.scrollHeight - window.innerHeight;
+              return top < 200 || window.scrollY >= max - 1;
+            }, id),
+          )
+          .toBe(true);
+      }
+    });
+
+    test("no jump on loading with an anchor in the address", async ({
+      page,
+    }) => {
+      await logJumps(page);
+      await simulate(page, { cores: 8, memory: 8 });
+      await page.goto(`${path}#services`);
+      await page.waitForSelector(FX_ON, { timeout: 10_000 });
+      await page.waitForTimeout(1500);
+      expect(await jumpLog(page)).toEqual([]);
+      expect(await page.evaluate(() => scrollY)).toBeGreaterThan(100);
+    });
+
+    test("no jump with reduced motion", async ({ page }) => {
+      await logJumps(page);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await simulate(page, { cores: 8, memory: 8 });
+      await page.goto(path);
+      await page.waitForTimeout(LOAD_DELAY_MS + 1500);
+      await page.locator(DISCOVER).click();
+      await expect
+        .poll(() => page.evaluate(() => scrollY))
+        .toBeGreaterThan(100);
+      await page.waitForTimeout(1000);
+      expect(await jumpLog(page)).toEqual([]);
+    });
+
+    test.describe("phone, low class", () => {
+      test.use({
+        viewport: { width: 375, height: 667 },
+        hasTouch: true,
+        isMobile: true,
+      });
+
+      test("no jump: the link only scrolls", async ({ page }) => {
+        await logJumps(page);
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(path);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        await expect(page.locator("html")).toHaveAttribute(
+          "data-fx-tier",
+          "low",
+        );
+        await page.locator(DISCOVER).click();
+        await expect
+          .poll(() => page.evaluate(() => scrollY))
+          .toBeGreaterThan(100);
+        await page.waitForTimeout(1000);
+        expect(await jumpLog(page)).toEqual([]);
+      });
+    });
+  });
+}
+
+// Spec 005, T26: cursor trail (RF-32) and adaptive degradation (RF-38). With
+// a fine pointer in the high class a trail of 14 particles at most follows
+// the cursor and is gone 0.6 s after it stops; the native cursor is never
+// hidden. No trail in the middle or low class or on touch. When the own cost
+// per frame of the effects is over 12 ms for 45 frames in a row, the class
+// goes one down (`data-fx-tier`) with its limits at once, and never back up.
+type CursorSamples = {
+  maxAlive: number;
+  lastAliveAt: number;
+  emitted: number;
+};
+
+/** Samples the cursor trail on every frame (through `fx:report`). */
+function sampleCursor(page: Page) {
+  return page.evaluate(() => {
+    const w = window as Window & { __cursor?: CursorSamples };
+    const samples: CursorSamples = { maxAlive: 0, lastAliveAt: 0, emitted: 0 };
+    w.__cursor = samples;
+    const tick = () => {
+      document.dispatchEvent(new Event("fx:report"));
+      const d = document.documentElement.dataset;
+      const alive = Number(d.fxCursorAlive) || 0;
+      samples.emitted = Number(d.fxCursorEmitted) || 0;
+      samples.maxAlive = Math.max(samples.maxAlive, alive);
+      if (alive > 0) samples.lastAliveAt = performance.now();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+function cursorSamples(page: Page): Promise<CursorSamples> {
+  return page.evaluate(
+    () => (window as Window & { __cursor?: CursorSamples }).__cursor!,
+  );
+}
+
+/** The cursor style of the page: html, body and anything set to `none`. */
+function cursorStyles(page: Page) {
+  return page.evaluate(() => ({
+    html: getComputedStyle(document.documentElement).cursor,
+    body: getComputedStyle(document.body).cursor,
+    hidden: [...document.querySelectorAll("*")].filter(
+      (el) => getComputedStyle(el).cursor === "none",
+    ).length,
+  }));
+}
+
+const TRAIL_CLASSES = [
+  {
+    name: "desktop, middle class",
+    use: { viewport: { width: 1280, height: 800 } },
+    signals: { cores: 4, memory: 8 },
+    tier: "mid",
+  },
+  {
+    name: "desktop with data saver, low class",
+    use: { viewport: { width: 1280, height: 800 } },
+    signals: { cores: 16, memory: 8, saveData: true },
+    tier: "low",
+  },
+  {
+    name: "touch tablet, middle class",
+    use: {
+      viewport: { width: 820, height: 1180 },
+      hasTouch: true,
+      isMobile: true,
+    },
+    signals: { cores: 8, memory: 8 },
+    tier: "mid",
+  },
+] as const;
+
+for (const { path } of homePages) {
+  test.describe(`${path}: cursor trail (RF-32)`, () => {
+    test.describe("desktop, high class", () => {
+      test.use({ viewport: { width: 1280, height: 800 } });
+
+      test("14 particles at most, gone 0.6 s after the cursor stops, native cursor kept", async ({
+        page,
+      }) => {
+        const errors = watchErrors(page);
+        await simulate(page, { cores: 8, memory: 8 });
+        await page.goto(`${path}?seed=${SEED}`);
+        const before = await cursorStyles(page);
+        await page.waitForSelector(FX_ON, { timeout: 10_000 });
+        await expect(page.locator("html")).toHaveAttribute(
+          "data-fx-tier",
+          "high",
+        );
+        await page.waitForTimeout(500);
+        await sampleCursor(page);
+        await page.mouse.move(80, 700);
+        await page.mouse.move(1200, 700, { steps: 60 });
+        const stoppedAt = await page.evaluate(() => performance.now());
+        const during = await cursorSamples(page);
+        await page.waitForTimeout(1000);
+        const after = await cursorSamples(page);
+        console.log(
+          `${path} cursor trail: ${after.emitted} emitted, up to ${after.maxAlive} alive, ` +
+            `last one ${Math.round(after.lastAliveAt - stoppedAt)} ms after the cursor stopped`,
+        );
+        expect(during.maxAlive).toBeGreaterThan(0);
+        expect(after.maxAlive).toBeLessThanOrEqual(14);
+        // More emitted than fit at once: the limit is the one holding.
+        expect(after.emitted).toBeGreaterThan(14);
+        // Gone 0.6 s after the cursor stopped (plus the frame that shows it).
+        expect(after.lastAliveAt - stoppedAt).toBeLessThanOrEqual(600 + 50);
+        const alive = await page.evaluate(() => {
+          document.dispatchEvent(new Event("fx:report"));
+          return Number(document.documentElement.dataset.fxCursorAlive);
+        });
+        expect(alive).toBe(0);
+        // The native cursor is never hidden or replaced.
+        expect(await cursorStyles(page)).toEqual(before);
+        expect(before.hidden).toBe(0);
+        expect(errors).toEqual([]);
+      });
+    });
+
+    for (const item of TRAIL_CLASSES) {
+      test.describe(item.name, () => {
+        test.use(item.use);
+
+        test("no trail", async ({ page }) => {
+          await simulate(page, item.signals);
+          await page.goto(path);
+          await page.waitForSelector(FX_ON, { timeout: 10_000 });
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-fx-tier",
+            item.tier,
+          );
+          await sampleCursor(page);
+          await page.mouse.move(40, 500);
+          await page.mouse.move(700, 520, { steps: 40 });
+          await page.waitForTimeout(300);
+          const samples = await cursorSamples(page);
+          expect(samples).toMatchObject({ maxAlive: 0, emitted: 0 });
+        });
+      });
+    }
+  });
+
+  test.describe(`${path}: adaptive degradation (RF-38)`, () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+    test.describe.configure({ timeout: 90_000 });
+
+    test("CPU x4 and over 12 ms a frame for 45 frames: one class down, its limits at once, never back up", async ({
+      page,
+    }) => {
+      const errors = watchErrors(page);
+      // Every frame of the canvas wipes what it drew: while __slowMs is set,
+      // that wipe costs as much (the own cost of the frame goes over 12 ms).
+      await page.addInitScript(() => {
+        const w = window as Window & { __slowMs?: number };
+        w.__slowMs = 0;
+        // Fast again as soon as the class changes, so each slow spell takes
+        // it down one class only (the test polls more slowly than that).
+        new MutationObserver(() => {
+          w.__slowMs = 0;
+        }).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["data-fx-tier"],
+        });
+        const wipe = CanvasRenderingContext2D.prototype.clearRect;
+        CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+          const until = performance.now() + (w.__slowMs ?? 0);
+          while (performance.now() < until) {
+            // Busy: the cost the measure must see.
+          }
+          return wipe.apply(this, args);
+        };
+      });
+      await simulate(page, { cores: 8, memory: 8 });
+      await page.goto(`${path}?seed=${SEED}`);
+      await page.waitForSelector(FX_ON, { timeout: 10_000 });
+      const tier = () => page.locator("html").getAttribute("data-fx-tier");
+      expect(await tier()).toBe("high");
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+
+      const planet = page.locator('[data-planet="rankia"] .service__planet');
+      await planet.evaluate((el) =>
+        el.scrollIntoView({ block: "center", behavior: "instant" }),
+      );
+      await page.waitForTimeout(500);
+      const box = (await planet.boundingBox())!;
+      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      /** Takes the cursor out of the planet and back in (a new hover). */
+      const hoverAgain = async () => {
+        await page.mouse.move(20, 20, { steps: 2 });
+        await page.mouse.move(centre.x, centre.y, { steps: 4 });
+      };
+      const setSlow = (ms: number) =>
+        page.evaluate((v) => {
+          (window as Window & { __slowMs?: number }).__slowMs = v;
+        }, ms);
+      const particles = () =>
+        page.evaluate(() => {
+          document.dispatchEvent(new Event("fx:report"));
+          return Number(document.documentElement.dataset.fxParticles) || 0;
+        });
+
+      // High class, sparks on the planet; then every frame costs 15 ms.
+      await hoverAgain();
+      await expect.poll(particles).toBeGreaterThan(0);
+      let slowAt = Date.now();
+      await setSlow(15);
+      await expect.poll(tier, { timeout: 30_000 }).toBe("mid");
+      console.log(
+        `${path} high -> mid in ${Date.now() - slowAt} ms of slow frames (CPU x4)`,
+      );
+      await setSlow(0);
+
+      // The middle class at once: 20 sparks a planet at most, no trail.
+      await hoverAgain();
+      await sampleCursor(page);
+      let most = 0;
+      for (let i = 0; i < 12; i++) {
+        await page.waitForTimeout(150);
+        most = Math.max(most, await particles());
+      }
+      expect(most).toBeGreaterThan(0);
+      expect(most).toBeLessThanOrEqual(20);
+      await page.mouse.move(centre.x + 30, centre.y + 10, { steps: 10 });
+      expect((await cursorSamples(page)).emitted).toBe(0);
+      // Fast frames again: it never goes back up.
+      await page.waitForTimeout(2000);
+      expect(await tier()).toBe("mid");
+
+      // Slow again: down to the low class, with no pointer effects.
+      slowAt = Date.now();
+      await setSlow(15);
+      await expect.poll(tier, { timeout: 30_000 }).toBe("low");
+      console.log(
+        `${path} mid -> low in ${Date.now() - slowAt} ms of slow frames (CPU x4)`,
+      );
+      await setSlow(0);
+      await hoverAgain();
+      await page.waitForTimeout(800);
+      expect(await particles()).toBe(0);
+      const still = await page.evaluate(() =>
+        [...document.querySelectorAll(".sky__layer, .service__planet")]
+          .filter((el) => getComputedStyle(el).transform !== "none")
+          .map((el) => el.className),
+      );
+      expect(still).toEqual([]);
+      await expect(page.locator(FX_ON)).toHaveCount(1);
+      await page.waitForTimeout(1500);
+      expect(await tier()).toBe("low");
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+      expect(errors).toEqual([]);
+    });
+  });
+}

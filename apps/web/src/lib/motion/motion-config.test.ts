@@ -11,6 +11,8 @@ import {
   REVEAL_DURATION_S,
   REVEAL_OFFSET_PX,
   REVEAL_START_RATIO,
+  SCROLL_FRAME_MS,
+  SCROLL_VELOCITY_MAX_AGE_MS,
   SMOOTH_IDLE_FRAMES,
   TRAVELER_MIN_PX,
   TRAVELER_MOVE_S,
@@ -97,5 +99,16 @@ describe("motion modules are pure", () => {
     expect(code).not.toMatch(
       /\b(window|document|navigator|Date\.now|new Date|performance\.now|requestAnimationFrame|setTimeout)\b/,
     );
+  });
+});
+
+describe("scroll speed (spec 005, T25)", () => {
+  it("a frame lasts about 16.7 ms", () => {
+    expect(SCROLL_FRAME_MS).toBeCloseTo(1000 / 60, 5);
+  });
+
+  it("forgets the speed a few frames after the last scroll event", () => {
+    expect(SCROLL_VELOCITY_MAX_AGE_MS).toBeGreaterThan(SCROLL_FRAME_MS);
+    expect(SCROLL_VELOCITY_MAX_AGE_MS).toBeLessThanOrEqual(250);
   });
 });

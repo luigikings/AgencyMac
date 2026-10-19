@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { JUMP_MAX_MS } from "./fx-config";
-import { jumpDurationMs, streakCountFor, streakLines } from "./streaks";
+import { JUMP_MAX_MS, JUMP_STREAK_WIDTH_PX } from "./fx-config";
+import {
+  jumpCoverage,
+  jumpDurationMs,
+  jumpEnvelope,
+  streakCountFor,
+  streakLines,
+} from "./streaks";
 
 const viewport = { width: 1280, height: 720 };
 const length = (l: { x1: number; y1: number; x2: number; y2: number }) =>
@@ -94,5 +100,56 @@ describe("jumpDurationMs (RF-31)", () => {
   it("grows with the distance and never goes below a visible minimum", () => {
     expect(jumpDurationMs(100)).toBeGreaterThanOrEqual(200);
     expect(jumpDurationMs(2000)).toBeGreaterThan(jumpDurationMs(100));
+  });
+});
+
+// RNF-10: one soft rise and fall per jump (never a flash), and the streaks
+// never cover more than 25 % of the window.
+describe("jumpEnvelope (RF-31, RNF-10)", () => {
+  it("starts and ends at 0 and peaks at 1 in the middle", () => {
+    expect(jumpEnvelope(0, 600)).toBe(0);
+    expect(jumpEnvelope(600, 600)).toBe(0);
+    expect(jumpEnvelope(300, 600)).toBeCloseTo(1, 5);
+  });
+
+  it("rises and then falls once, with no jumps between frames", () => {
+    const values = Array.from({ length: 61 }, (_, i) =>
+      jumpEnvelope(i * 10, 600),
+    );
+    const peak = values.indexOf(Math.max(...values));
+    for (let i = 1; i < values.length; i++) {
+      const step = values[i]! - values[i - 1]!;
+      if (i <= peak) expect(step).toBeGreaterThanOrEqual(0);
+      else expect(step).toBeLessThanOrEqual(0);
+      expect(Math.abs(step)).toBeLessThan(0.1);
+    }
+  });
+
+  it("is 0 outside the jump and for a jump without duration", () => {
+    expect(jumpEnvelope(-10, 600)).toBe(0);
+    expect(jumpEnvelope(700, 600)).toBe(0);
+    expect(jumpEnvelope(10, 0)).toBe(0);
+  });
+});
+
+describe("jumpCoverage (RNF-10)", () => {
+  it("never covers more than 25 % of the window, even on a small one", () => {
+    for (const view of [
+      { width: 320, height: 568 },
+      { width: 375, height: 667 },
+      { width: 1280, height: 720 },
+      { width: 1920, height: 1080 },
+    ]) {
+      expect(jumpCoverage("high", view)).toBeLessThanOrEqual(0.25);
+      expect(jumpCoverage("mid", view)).toBeLessThan(
+        jumpCoverage("high", view),
+      );
+    }
+    expect(jumpCoverage("low", { width: 375, height: 667 })).toBe(0);
+  });
+
+  it("uses thin streaks", () => {
+    expect(JUMP_STREAK_WIDTH_PX).toBeGreaterThan(0);
+    expect(JUMP_STREAK_WIDTH_PX).toBeLessThanOrEqual(2);
   });
 });

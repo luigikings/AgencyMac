@@ -27,13 +27,35 @@ export function journeyProgress(
   return Math.min(1, Math.max(0, scrollY / scrollable));
 }
 
-/** Progress at which each section top (page coordinates) reaches the window top. */
+/**
+ * Progress at which each section top (page coordinates) reaches the mark of
+ * the window: its top with `mark` 0, its middle with 0.5. Stops that cannot
+ * be reached by scrolling are clamped to 0 or 1.
+ */
 export function stopProgresses(
   tops: readonly number[],
   docHeight: number,
   viewportHeight: number,
+  mark = 0,
 ): number[] {
-  return tops.map((top) => journeyProgress(top, docHeight, viewportHeight));
+  return tops.map((top) =>
+    journeyProgress(top - mark * viewportHeight, docHeight, viewportHeight),
+  );
+}
+
+/**
+ * Offset (px) of the rocket from the start of a rail `length` long when the
+ * rocket is `size` long: 0 at the start, the end of the rail at 1, and never
+ * outside it.
+ */
+export function railOffset(
+  progress: number,
+  length: number,
+  size: number,
+): number {
+  const room = length - size;
+  if (!Number.isFinite(progress) || !(room > 0)) return 0;
+  return Math.min(1, Math.max(0, progress)) * room;
 }
 
 /** Which stops have been reached (inclusive) at `progress`. */

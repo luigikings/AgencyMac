@@ -39,6 +39,13 @@ export const REVEAL_START_RATIO = 0.8;
 // plan 14.2).
 export const SMOOTH_IDLE_FRAMES = 3;
 
+// Speed of the scroll for the space jump (spec 005, RF-31, plan 14.6). Without
+// smooth scrolling it comes from the positions of two scroll events; a scroll
+// event after a still page counts as one frame (an instant jump is fast), and
+// the speed is forgotten once no scroll event has come for this long.
+export const SCROLL_FRAME_MS = 1000 / 60;
+export const SCROLL_VELOCITY_MAX_AGE_MS = 100;
+
 // GSAP's ticker only runs while a tween plays: every this many frames it checks
 // whether any is left and sleeps if not (GSAP's `autoSleep`, 120 by default).
 // Counted in frames, not time: with 60 a busy CPU (20 frames a second) kept it

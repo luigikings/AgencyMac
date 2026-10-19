@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STOPS,
   journeyProgress,
+  railOffset,
   stopProgresses,
   visitedStops,
 } from "./journey";
@@ -78,5 +79,47 @@ describe("visitedStops", () => {
       true,
       true,
     ]);
+  });
+});
+
+describe("stopProgresses with a mark (T24)", () => {
+  it("reaches a stop when its section top crosses the mark of the window", () => {
+    // Mark at half the window: each top counts 400 px earlier.
+    expect(stopProgresses([0, 1500, 2600], 3000, 800, 0.5)).toEqual([
+      0, 0.5, 1,
+    ]);
+  });
+
+  it("lights the first section at the top when it starts above the mark", () => {
+    const stops = stopProgresses([187, 1017], 4890, 667, 0.5);
+    expect(stops[0]).toBe(0);
+    expect(visitedStops(0, stops)[0]).toBe(true);
+  });
+
+  it("without a mark is the section top at the window top", () => {
+    expect(stopProgresses([1100], 3000, 800, 0)).toEqual(
+      stopProgresses([1100], 3000, 800),
+    );
+  });
+});
+
+describe("railOffset (T24)", () => {
+  it("puts the rocket at the start at 0 and at the end at 1", () => {
+    expect(railOffset(0, 400, 24)).toBe(0);
+    expect(railOffset(1, 400, 24)).toBe(376);
+  });
+
+  it("is proportional in between", () => {
+    expect(railOffset(0.5, 400, 24)).toBe(188);
+  });
+
+  it("never leaves the rail", () => {
+    expect(railOffset(-1, 400, 24)).toBe(0);
+    expect(railOffset(2, 400, 24)).toBe(376);
+    expect(railOffset(Number.NaN, 400, 24)).toBe(0);
+  });
+
+  it("is 0 when the rail is not longer than the rocket", () => {
+    expect(railOffset(0.7, 20, 24)).toBe(0);
   });
 });

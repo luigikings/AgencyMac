@@ -437,7 +437,7 @@ export function startMotion(): void {
       if (window.matchMedia(FINE_POINTER_QUERY).matches) {
         import("./smooth-scroll")
           .then((module) => {
-            if (!cancelled) stopSmooth = module.startSmoothScroll();
+            if (!cancelled) stopSmooth = module.startSmoothScroll(hub);
           })
           .catch(() => {
             // The page scrolls natively without it.

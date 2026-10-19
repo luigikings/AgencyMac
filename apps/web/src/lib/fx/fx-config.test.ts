@@ -14,11 +14,16 @@ import {
   BUBBLE_TAIL_REACH_PX,
   BUBBLE_TEXT_GAP_PX,
   BUBBLE_WIDTHS_PX,
+  CURSOR_TRAIL_SPACING_PX,
   DEGRADE_LIMIT_MS,
   DEGRADE_WINDOW_FRAMES,
   FX_TIERS,
   GREET_MS,
   GREET_SWAY_DEG,
+  JOURNEY_MOBILE_PX,
+  JOURNEY_ROCKET_PX,
+  JOURNEY_STOP_MARK,
+  JOURNEY_WIDE_QUERY,
   JUMP_MAX_MS,
   LOOK_TAU_MS,
   MAC_BOUNCE_MS,
@@ -343,5 +348,29 @@ describe("Mac's bursts and turbo mode (RF-28, RF-29)", () => {
     expect(TURBO_SPIN_DELAY).toBeGreaterThanOrEqual(0);
     expect(TURBO_SPIN_DELAY).toBeLessThan(0.5);
     expect(TURBO_COOLDOWN_MS).toBe(10_000);
+  });
+});
+
+describe("journey indicator (RF-30)", () => {
+  it("is at most 6 px thick on phones, rocket included", () => {
+    expect(JOURNEY_MOBILE_PX).toBeGreaterThan(0);
+    expect(JOURNEY_MOBILE_PX).toBeLessThanOrEqual(6);
+    expect(JOURNEY_ROCKET_PX.narrow).toBeLessThanOrEqual(JOURNEY_MOBILE_PX);
+    expect(JOURNEY_ROCKET_PX.wide).toBeGreaterThan(JOURNEY_ROCKET_PX.narrow);
+  });
+
+  it("turns vertical from 64 rem", () => {
+    expect(JOURNEY_WIDE_QUERY).toBe("(min-width: 64rem)");
+  });
+
+  it("reaches a stop when its section crosses the middle of the window", () => {
+    expect(JOURNEY_STOP_MARK).toBe(0.5);
+  });
+});
+
+describe("cursor trail constants (RF-32)", () => {
+  it("leaves a particle every few px", () => {
+    expect(CURSOR_TRAIL_SPACING_PX).toBeGreaterThanOrEqual(4);
+    expect(CURSOR_TRAIL_SPACING_PX).toBeLessThanOrEqual(40);
   });
 });

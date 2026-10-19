@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sky/rng";
 import {
   BURST_SPEED_PX_MS,
+  CURSOR_TRAIL_SPACING_PX,
+  CURSOR_TRAIL_SPEED_PX_MS,
+  CURSOR_TRAIL_TONES,
   PARTICLE_LIFE_MAX_MS,
   PARTICLE_LIFE_MS,
   SPARK_FILL_MS,
@@ -16,6 +19,8 @@ import {
   burstLaunch,
   capFor,
   createPool,
+  cursorDue,
+  cursorTrailCap,
   emitRate,
   sparkCap,
   sparkLaunch,
@@ -374,5 +379,39 @@ describe("burstLaunch (RF-28, RF-29)", () => {
       quadrants.add(`${velocity.x > 0}${velocity.y > 0}`);
     }
     expect(quadrants.size).toBe(4);
+  });
+});
+
+// Spec 005, T26: the cursor trail (RF-32).
+describe("cursor trail (RF-32)", () => {
+  it("has room for 14 particles in the high class and none in the others", () => {
+    expect(cursorTrailCap("high")).toBe(14);
+    expect(cursorTrailCap("mid")).toBe(0);
+    expect(cursorTrailCap("low")).toBe(0);
+    expect(cursorTrailCap("off")).toBe(0);
+  });
+
+  it("emits one particle every CURSOR_TRAIL_SPACING_PX travelled", () => {
+    const s = CURSOR_TRAIL_SPACING_PX;
+    expect(cursorDue(0, 2 * s + 2, s)).toEqual({ count: 2, carry: 2 });
+    expect(cursorDue(s - 1, 1, s)).toEqual({ count: 1, carry: 0 });
+    expect(cursorDue(0, s / 2, s)).toEqual({ count: 0, carry: s / 2 });
+  });
+
+  it("emits nothing without movement or with a bad spacing", () => {
+    expect(cursorDue(3, 0, 14)).toEqual({ count: 0, carry: 3 });
+    expect(cursorDue(3, Number.NaN, 14)).toEqual({ count: 0, carry: 3 });
+    expect(cursorDue(3, 40, 0)).toEqual({ count: 0, carry: 0 });
+  });
+
+  it("is gone 0.6 s after the cursor stops: every particle lives less", () => {
+    expect(PARTICLE_LIFE_MS.cursor[1]).toBeLessThan(600);
+    expect(PARTICLE_LIFE_MS.cursor[0]).toBeGreaterThan(0);
+  });
+
+  it("drifts slowly, in brand colours", () => {
+    expect(CURSOR_TRAIL_SPEED_PX_MS[0]).toBeGreaterThanOrEqual(0);
+    expect(CURSOR_TRAIL_SPEED_PX_MS[1]).toBeLessThanOrEqual(0.05);
+    expect(CURSOR_TRAIL_TONES.length).toBeGreaterThan(0);
   });
 });

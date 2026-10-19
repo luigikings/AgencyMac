@@ -66,9 +66,14 @@ export function toneValues(
 /** Padding around the marked boxes when they are wiped, in CSS px. */
 const WIPE_PAD = 4;
 
+/**
+ * `onFrame` gets the own cost (ms) of every frame drawn and whether the loop
+ * goes on after it (RF-38: the degradation watches frames in a row).
+ */
 export function createFxCanvas(
   maxDensity: number,
   maxParticles: number,
+  onFrame?: (costMs: number, goesOn: boolean) => void,
 ): FxCanvas | null {
   const el = document.createElement("canvas");
   const ctx = el.getContext("2d");
@@ -159,10 +164,12 @@ export function createFxCanvas(
     }
     dirty = next;
     frames++;
-    costs.push(performance.now() - start);
+    const cost = performance.now() - start;
+    costs.push(cost);
     if (costs.length > FRAME_COST_SAMPLES) costs.shift();
     // Keep going while something is alive or a box is still to be wiped.
     frame = busy || dirty ? window.requestAnimationFrame(tick) : 0;
+    onFrame?.(cost, frame !== 0);
   };
 
   const alive = () =>

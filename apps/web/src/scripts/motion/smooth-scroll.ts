@@ -8,7 +8,9 @@ import {
   keepTicking,
   needsResync,
   nextIdleFrames,
+  pxPerSecond,
 } from "../../lib/motion/smooth-loop";
+import type { ScrollHub } from "./scroll-hub";
 
 // Smooth scrolling (RF-37, plan D16). Only loaded for a fine pointer without
 // reduced motion. Scrolling stays native (the keyboard, the browser's search
@@ -17,8 +19,10 @@ import {
 // every position. Spec 005, D19 (plan 14.2): Lenis has a frame loop of its own
 // that only runs while the page moves and stops after SMOOTH_IDLE_FRAMES still
 // frames, so at rest no frame is requested (RF-39). Nothing is hooked to GSAP's
-// ticker. Returns the cleanup function.
-export function startSmoothScroll(): () => void {
+// ticker. While its loop runs it gives the scroll handler the speed of the
+// scroll for the space jump (spec 005, RF-31, plan 14.6). Returns the cleanup
+// function.
+export function startSmoothScroll(hub?: ScrollHub): () => void {
   const style = document.createElement("style");
   style.setAttribute("data-lenis-css", "");
   style.textContent = lenisCss;
@@ -32,11 +36,15 @@ export function startSmoothScroll(): () => void {
   // runs (the first frame after waking adds no time).
   let clock = 0;
   let last = -1;
+  // Speed of the last step of the loop, in px/s (Lenis gives px per step).
+  let speed = 0;
 
   const loop = (time: number) => {
-    clock += last < 0 ? 0 : time - last;
+    const step = last < 0 ? 0 : time - last;
+    clock += step;
     last = time;
     lenis.raf(clock);
+    speed = pxPerSecond(lenis.velocity, step);
     idle = nextIdleFrames(idle, lenis.isScrolling !== false);
     if (keepTicking(idle, SMOOTH_IDLE_FRAMES)) {
       frame = window.requestAnimationFrame(loop);
@@ -73,6 +81,8 @@ export function startSmoothScroll(): () => void {
     else if (lenis.isScrolling !== false) wake();
   };
 
+  const removeVelocity = hub?.useVelocity(() => (frame ? speed : null));
+
   // Anything that may start a movement wakes the loop: the wheel, a click on
   // an anchor (Lenis scrolls to it), the keyboard and any other scroll.
   window.addEventListener("wheel", wake, { passive: true });
@@ -86,6 +96,7 @@ export function startSmoothScroll(): () => void {
     window.removeEventListener("keydown", wake);
     window.removeEventListener("scroll", wake);
     document.removeEventListener("visibilitychange", onVisibility);
+    removeVelocity?.();
     halt();
     lenis.destroy();
     style.remove();

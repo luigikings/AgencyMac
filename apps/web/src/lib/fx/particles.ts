@@ -281,3 +281,25 @@ export function trailLaunch(
     velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
   };
 }
+
+/** Most particles of the cursor trail in the tier (RF-32: 14, high only). */
+export function cursorTrailCap(tier: FxTier): number {
+  return TIER_PARAMS[tier].cursorTrailMax;
+}
+
+/**
+ * Particles the cursor leaves after travelling `distancePx`, one every
+ * `spacingPx`, with the distance left over from before (`carryPx`). Returns
+ * how many and what is left over for the next move.
+ */
+export function cursorDue(
+  carryPx: number,
+  distancePx: number,
+  spacingPx: number,
+): { count: number; carry: number } {
+  if (!(spacingPx > 0)) return { count: 0, carry: 0 };
+  if (!(distancePx > 0)) return { count: 0, carry: carryPx };
+  const total = carryPx + distancePx;
+  const count = Math.floor(total / spacingPx);
+  return { count, carry: total - count * spacingPx };
+}

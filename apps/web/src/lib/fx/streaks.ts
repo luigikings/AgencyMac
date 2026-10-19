@@ -6,6 +6,7 @@ import {
   JUMP_FULL_SPEED_PX_S,
   JUMP_MAX_MS,
   JUMP_MIN_MS,
+  JUMP_STREAK_WIDTH_PX,
   STREAK_LENGTH_PER_SPEED,
   STREAK_MAX_LENGTH_PX,
   TIER_PARAMS,
@@ -58,4 +59,30 @@ export function streakCountFor(tier: FxTier, speed: number): number {
 export function jumpDurationMs(distance: number): number {
   const ms = JUMP_MIN_MS + Math.max(0, distance) * 0.25;
   return Math.min(JUMP_MAX_MS, ms);
+}
+
+/**
+ * Strength 0..1 of the jump `elapsed` ms after it began, for a jump of `ms`:
+ * one soft rise and fall (half a sine), 0 at both ends and outside (RNF-10:
+ * no flash).
+ */
+export function jumpEnvelope(elapsed: number, ms: number): number {
+  if (!(ms > 0) || !(elapsed > 0) || elapsed >= ms) return 0;
+  return Math.sin((Math.PI * elapsed) / ms);
+}
+
+/**
+ * Most of the window (0..1) the streaks of the tier can cover at once: every
+ * streak at its longest, as wide as JUMP_STREAK_WIDTH_PX (RNF-10: ≤ 0.25).
+ */
+export function jumpCoverage(
+  tier: FxTier,
+  viewport: { width: number; height: number },
+): number {
+  const area = viewport.width * viewport.height;
+  if (!(area > 0)) return 0;
+  const longest = Math.min(STREAK_MAX_LENGTH_PX, viewport.height);
+  return (
+    (TIER_PARAMS[tier].jumpStreaksMax * longest * JUMP_STREAK_WIDTH_PX) / area
+  );
 }

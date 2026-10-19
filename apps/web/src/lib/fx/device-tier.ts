@@ -63,3 +63,19 @@ export function shouldDegrade(
   const mean = recent.reduce((sum, ms) => sum + ms, 0) / windowFrames;
   return mean > limitMs;
 }
+
+/**
+ * The costs the degradation looks at after one more frame (RF-38): the last
+ * `windowFrames` of frames in a row. When the canvas loop stops (`goesOn`
+ * false) the count starts again; a cost that is not a number is ignored.
+ */
+export function nextCosts(
+  costs: readonly number[],
+  costMs: number,
+  goesOn: boolean,
+  windowFrames: number = DEGRADE_WINDOW_FRAMES,
+): number[] {
+  if (!goesOn) return [];
+  if (!Number.isFinite(costMs)) return [...costs];
+  return [...costs, costMs].slice(-windowFrames);
+}

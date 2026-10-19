@@ -1,3 +1,4 @@
+import { nextVelocity, velocityNow } from "../../lib/motion/smooth-loop";
 import { journeyProgress } from "../../lib/sky/journey";
 
 // Single scroll handler of the home page (spec 005, plan section 5 and D19).
@@ -20,6 +21,15 @@ export type ScrollHub = {
   add(listener: ScrollListener): Remove;
   /** Called once the layout settles after a resize or a rotation. */
   onLayout(listener: () => void): Remove;
+  /**
+   * Vertical speed of the scroll now, in px/s (down is positive): from the
+   * source registered with `useVelocity` (smooth scrolling while its loop
+   * runs) or else from the positions of the last scroll events (spec 005,
+   * RF-31, plan 14.6).
+   */
+  velocity(): number;
+  /** Registers a better source of speed; it returns null when it has none. */
+  useVelocity(source: () => number | null): Remove;
   stop(): void;
 };
 
@@ -27,6 +37,9 @@ export function createScrollHub(): ScrollHub {
   const listeners = new Set<ScrollListener>();
   const layoutListeners = new Set<() => void>();
   let timer = 0;
+  let source: (() => number | null) | null = null;
+  let sample: { y: number; t: number } | null = null;
+  let speed = 0;
 
   const read = (): ScrollState => {
     const y = window.scrollY;
@@ -41,6 +54,9 @@ export function createScrollHub(): ScrollHub {
   };
   const emit = () => {
     const state = read();
+    const t = performance.now();
+    speed = nextVelocity(sample, state.y, t);
+    sample = { y: state.y, t };
     for (const listener of listeners) listener(state);
   };
   const onResize = () => {
@@ -63,12 +79,24 @@ export function createScrollHub(): ScrollHub {
       layoutListeners.add(listener);
       return () => layoutListeners.delete(listener);
     },
+    velocity() {
+      const own = source?.() ?? null;
+      if (own !== null) return own;
+      return sample ? velocityNow(speed, sample.t, performance.now()) : 0;
+    },
+    useVelocity(next) {
+      source = next;
+      return () => {
+        if (source === next) source = null;
+      };
+    },
     stop() {
       window.removeEventListener("scroll", emit);
       window.removeEventListener("resize", onResize);
       window.clearTimeout(timer);
       listeners.clear();
       layoutListeners.clear();
+      source = null;
     },
   };
 }
