@@ -842,3 +842,26 @@ export function macReactions(options: {
     },
   };
 }
+
+/**
+ * RF-27 and T30: Mac's line on arriving at the contact section
+ * (`mac.arrive.contact`), next to the launch pad's rocket, each time the pad
+ * comes into view (the bubbles never repeat a line twice in a row). Returns
+ * the cleanup.
+ */
+export function contactArrival(bubbles: Bubbles): () => void {
+  const rocket = document.querySelector<HTMLElement>(".contact__rocket");
+  if (!rocket || !("IntersectionObserver" in window)) return () => {};
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          bubbles.say([LINE_KEYS.arrive.contact], rocket);
+        }
+      }
+    },
+    { threshold: 0.6 },
+  );
+  observer.observe(rocket);
+  return () => observer.disconnect();
+}

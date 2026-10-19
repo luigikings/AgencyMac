@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EMBLEM_SIZE,
   constellationOf,
   constellationPath,
   edgesCross,
@@ -134,5 +135,21 @@ describe("constellationPath", () => {
 
   it("has no hex colour (it is only geometry)", () => {
     expect(constellationPath(constellationOf("Luigi"), 80)).not.toMatch(/#/);
+  });
+});
+
+// Spec 005, T29: size of the emblem drawn in each team card (SVG units = px).
+describe("EMBLEM_SIZE", () => {
+  it("is a small square that keeps every star inside", () => {
+    expect(EMBLEM_SIZE).toBeGreaterThanOrEqual(40);
+    expect(EMBLEM_SIZE).toBeLessThanOrEqual(80);
+    for (const name of NAMES) {
+      for (const n of constellationPath(constellationOf(name), EMBLEM_SIZE)
+        .match(/[\d.]+/g)!
+        .map(Number)) {
+        expect(n).toBeGreaterThanOrEqual(0);
+        expect(n).toBeLessThanOrEqual(EMBLEM_SIZE);
+      }
+    }
   });
 });

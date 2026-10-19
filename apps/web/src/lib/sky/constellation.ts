@@ -22,6 +22,9 @@ function seedOf(name: string): number {
   return hash >>> 0;
 }
 
+/** Side of the emblem in each team card, in SVG units (px) (T29). */
+export const EMBLEM_SIZE = 56;
+
 const MARGIN = 0.08;
 const START_MIN_DISTANCE = 0.22;
 const FLOOR_MIN_DISTANCE = 0.12;

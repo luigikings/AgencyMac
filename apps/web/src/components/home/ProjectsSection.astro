@@ -31,12 +31,17 @@ const { locale } = Astro.props;
     <div class="projects__list">
       {PROJECTS.map((project) => (
         <article class="project">
-          <h3>{project.name}</h3>
-          <p>{t(locale, project.descriptionKey)}</p>
-          <a href={project.url} target="_blank" rel="noopener">
-            {t(locale, "projects.visit")} {project.domain}
-            <span class="project__notice">{t(locale, "projects.newTab")}</span>
-          </a>
+          <span class="project__border" aria-hidden="true" />
+          <div class="project__panel">
+            <h3>{project.name}</h3>
+            <p>{t(locale, project.descriptionKey)}</p>
+            <a href={project.url} target="_blank" rel="noopener">
+              {t(locale, "projects.visit")} {project.domain}
+              <span class="project__notice">
+                {t(locale, "projects.newTab")}
+              </span>
+            </a>
+          </div>
         </article>
       ))}
     </div>
@@ -87,11 +92,76 @@ const { locale } = Astro.props;
     gap: 1.5rem;
   }
 
+  /* RF-33 (spec 005, plan D10): a cosmic border. The card is a ring of 2 px
+     where a conic gradient of brand colours shows around a solid panel; the
+     text sits on the panel, so its contrast can be computed. The gradient is
+     drawn by an empty decorative element (and its ::before), not by a
+     pseudo-element of the card: axe cannot tell the background of text
+     whose ancestor has one, and leaves its contrast as "needs review". It
+     is a square layer twice as wide as the card, centred, so it covers every
+     corner whatever its turn; it only turns (with transform, on the
+     compositor) while the card has the cursor or the focus, and only with
+     animation. Without it, the border is there and still. */
   .project {
-    padding: 1.5rem;
-    border: 2px solid var(--color-accent-green);
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    padding: 2px;
     border-radius: 1rem;
+    background: var(--color-accent-green);
+  }
+
+  .project__border {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    /* The turning layer is wider than the card: clipped here (clip, not
+       hidden: no scroll container is made). */
+    overflow: clip;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  /* The turning gradient: inside the border element, so no box of the card
+     reaches past the card itself (axe looks at those boxes). */
+  .project__border::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(
+      var(--color-accent-green),
+      var(--color-button-hover),
+      var(--color-logo-gradient-1),
+      var(--color-logo-gradient-3),
+      var(--color-accent-green)
+    );
+  }
+
+  /* Positioned above the border, so the stack is plain for axe too. */
+  .project__panel {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 1.5rem;
+    border-radius: calc(1rem - 2px);
     background: var(--color-bg-dark);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project:is(:hover, :focus-within) .project__border::before {
+      animation: project-border-spin 4s linear infinite;
+    }
+
+    @keyframes project-border-spin {
+      to {
+        transform: translate(-50%, -50%) rotate(1turn);
+      }
+    }
   }
 
   .project h3 {

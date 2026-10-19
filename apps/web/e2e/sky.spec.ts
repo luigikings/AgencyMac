@@ -231,6 +231,19 @@ test.describe("With reduced motion (RF-9, RF-40)", () => {
         0,
       );
     });
+
+    // T28: the cosmic border of the project cards does not turn either.
+    test(`${path}: no animation with the cursor or the focus on a project card`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await page.locator("#projects .project").first().hover();
+      await page.locator("#projects .project a").last().focus();
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => document.getAnimations().length)).toBe(
+        0,
+      );
+    });
   }
 });
 

@@ -215,7 +215,8 @@ Nunca: instalar dependencias (ninguna prevista; si hiciera falta una, parar y av
     - **Medido (T26, 2026-10-19):** tests nuevos vistos en rojo antes del código (Vitest: 10 fallos en `particles.test.ts` (`cursorTrailCap`, `cursorDue` y constantes del rastro), `device-tier.test.ts` (`nextCosts`) y `fx-config.test.ts`; Playwright: los 2 casos positivos de rastro y los 2 de degradado en rojo; "sin rastro" en media, baja y tableta táctil y el reposo tras mover el cursor ya pasaban sin código, como deben) y después en verde, en `/` y `/en/`. **Rastro** (1280×800, clase alta, cursor de 80 a 1200 px en 60 pasos): **80 emitidas, como máximo 14 vivas**, la última desaparece **513–528 ms** después de parar el cursor (≤ 600); `cursor` calculado de `html` y `body` igual antes y después (`auto`) y ningún elemento con `cursor: none`. Sin rastro (0 emitidas) en clase media, baja (ahorro de datos) ni en tableta táctil. **RF-39:** 0 llamadas a `requestAnimationFrame` en 2 s, 2,5 s después de mover el cursor (escritorio clase alta y móvil). **Degradado** (CPU ×4 por CDP y un coste añadido de 15 ms por fotograma en el borrado del canvas, con chispas sobre Rankia): alta → media en **1,0–2,1 s** de fotogramas lentos y media → baja en **1,0–1,1 s**; en media, al instante, como máximo **20 chispas** y sin rastro; con fotogramas rápidos sigue en media 2 s después (nunca sube); en baja, 0 partículas al pasar por un planeta y ni capas de estrellas ni planetas con `transform`; `data-fx="on"` sigue y sin errores. 8 repeticiones seguidas de rastro y degradado: 80/80. Coste por fotograma (`web-latency`): 0,145 / 0,3 ms (media / p95) y con chispas 0,556 / 0,8 ms; latencia de interacción 48–80 ms. Peso (gzip 9): efectos **13,7 KB** (14039 B; antes 13748 B), núcleo 31430 B (antes 30357: el empaquetador mueve al núcleo código compartido con los efectos), Lenis 5889 B, JS total **51,3 KB** (52494 B; antes 51130 B), antes de `load` 1136 B. Pruebas: Vitest 62 archivos / 1469 tests; Playwright 670 (`pnpm test` completo); `pnpm lint` y `pnpm format:check` en verde.
     - **Decisiones no previstas por el plan:** (1) **Cómo se aplican los límites de la clase nueva "de inmediato":** se retiran todos los efectos y se arrancan otra vez con la clase de abajo (`startFx` envuelve a `startTier`), y `data-fx-tier` cambia. Así cambian a la vez todos los límites (canvas, partículas, chispas, estela, salto, fugaces, paralaje, rastro) sin que cada módulo tenga que saber cambiar de clase en caliente. Efecto visible: en ese instante desaparece la burbuja que hubiera y se corta un vuelo o un turbo en curso (Mac se recoloca); el indicador del viaje se vuelve a crear en el mismo sitio. (2) **Coste medido:** el propio de cada fotograma del canvas (lo que ya mide `fx:report`), que el canvas pasa a `fx-layer` con `onFrame(coste, sigue)`. "45 fotogramas seguidos": si el bucle del canvas se para, la cuenta empieza de nuevo (`nextCosts`, pura, en `device-tier.ts`); la decisión es `shouldDegrade` (T5). El cambio se hace fuera del fotograma en curso (`setTimeout`). (3) **Rastro** (`cursor-trail.ts`): una partícula cada `CURSOR_TRAIL_SPACING_PX` = 14 px recorridos (`cursorDue`), repartidas a lo largo del movimiento; con el pool lleno (14) la más vieja deja su sitio, para que el rastro no se quede atrás; vida 300–550 ms (la de `cursor` en `PARTICLE_LIFE_MS`), deriva lenta (`CURSOR_TRAIL_SPEED_PX_MS`), encoge al apagarse, tonos `buttonHover`, `logoGradient1` y `text`; respeta `canvas.room()`. Solo con ratón (`pointerType` `mouse`). Marcas nuevas de `fx:report`: `data-fx-cursor-emitted` y `data-fx-cursor-alive`. (4) **Dos pruebas anteriores ajustadas, sin cambiar lo que exigen:** las chispas de RF-14 ("up to 40 sparks") y el coste por fotograma con chispas contaban todas las partículas del canvas y ahora también entra el rastro del mismo ratón (50 y 48 > 40): cuentan las partículas menos las del rastro.
 
-- [ ] **T27. REVISIÓN R4: microinteracciones.** RF-20, RF-30, RF-31, RF-32, RF-37, RF-38
+- [x] **T27. REVISIÓN R4: microinteracciones.** RF-20, RF-30, RF-31, RF-32, RF-37, RF-38
+  - **Resultado:** aprobada por el usuario 2026-10-19 en staging sin cambios (commit 2bf71ff); acepta tal cual el solape de la barra del viaje al final de la página en móvil, el cohete de 6 px, la intensidad del rastro, los trazos del salto y el reinicio de efectos al bajar de clase.
   - Hecho cuando:
     - `pnpm test`, `pnpm lint`, `pnpm format:check` y `pnpm build` en verde; capturas y notas de botón, indicador, salto y rastro.
     - **Parada: push del coordinador y aprobación del usuario en staging (móvil y escritorio, incluida una prueba en un móvil real).** Anotar el resultado.
@@ -241,26 +242,96 @@ Nunca: instalar dependencias (ninguna prevista; si hiciera falta una, parar y av
 
 ## Bloque E: proyectos, equipo, contacto y pie
 
-- [ ] **T28. Tarjetas de proyectos con borde cósmico: primero `home-page.spec.ts` y `sky.spec.ts` (borde con ≥ 2 colores de token; el borde gira solo en hover o foco-dentro y solo con animación; el texto va sobre panel sólido y axe lo da como "pasa"; los enlaces externos de la 004 intactos; 320 y 375 px sin desbordamiento); después `ProjectsSection.astro`.** RF-33, RF-40
+- [x] **T28. Tarjetas de proyectos con borde cósmico: primero `home-page.spec.ts` y `sky.spec.ts` (borde con ≥ 2 colores de token; el borde gira solo en hover o foco-dentro y solo con animación; el texto va sobre panel sólido y axe lo da como "pasa"; los enlaces externos de la 004 intactos; 320 y 375 px sin desbordamiento); después `ProjectsSection.astro`.** RF-33, RF-40
   - Hecho cuando:
     - Los tests pasaron de rojo a verde en ES y EN y los tests de proyectos de la 004 siguen en verde.
+    - **Medido (T28, 2026-10-19):** tests nuevos de `home-page.spec.ts` vistos en rojo antes del código (6 de 14: borde y panel, giro con cursor y foco, y movimiento reducido, en `/` y `/en/`; los de axe, desbordamiento a 320/375 px y el nuevo de `sky.spec.ts` ya pasaban con las tarjetas de la 004 y quedan como guarda) y después en verde. Borde: `conic-gradient` con 4 colores de token (`accentGreen`, `buttonHover`, `logoGradient1`, `logoGradient3`), anillo de 2 px por los cuatro lados alrededor de un panel sólido `bgDark` (sin imagen, opacidad 1) con título, descripción y enlace; quieto en reposo; con el cursor solo gira el de esa tarjeta (`project-border-spin`, 4 s por vuelta, `transform` cambia en 300 ms) y con el foco en el enlace de la otra, la otra; al salir o perder el foco, para. Con movimiento reducido el borde está y nunca gira (`document.getAnimations()` vacío también con cursor y foco). axe con un borde girando: 0 infracciones, 0 incompletos y el contraste de todos los textos de las tarjetas "pasa". Enlaces externos de la 004 intactos (`href`, `target="_blank"`, `rel="noopener"`). Sin desbordamiento a 320 y 375 px con un borde girando. CSS (gzip) 8,5 KB (8723 B) frente a 30 KB. Pruebas: Vitest 62 archivos / 1469; Playwright 684 (`pnpm test` completo); `pnpm lint` y `pnpm format:check` en verde. Capturas a 1280 y 375 px con el cursor encima revisadas (fuera del repo).
+    - **Decisiones no previstas por el plan:** (1) **El degradado no es un pseudo-elemento de la tarjeta** (plan D10), sino el `::before` de un elemento vacío y decorativo (`span.project__border`, `aria-hidden`) que ocupa la tarjeta, recorta (`overflow: clip`) y queda debajo del panel (`z-index` 0 y 1 explícitos). Con el pseudo-elemento en la tarjeta axe no sabía el fondo de los textos ("pseudoContent") y lo dejaba como incompleto; con la capa grande como elemento hermano del panel, su caja (el doble de ancha) pisaba la otra tarjeta y axe daba `bgOverlap`/`elmPartiallyObscuring`. Sigue siendo un cuadrado del doble de ancho, centrado, que solo gira con `transform` (compositor). (2) Los `@keyframes` van dentro del bloque `no-preference` (lo exige `motion-css.test.ts`). (3) **Dos pruebas anteriores de "texto cortado" ajustadas:** `responsive.spec.ts` (RNF-9) y `home.spec.ts` ("Projects and team on a phone", de la 004) marcaban como texto cortado cualquier bloque con `scrollWidth > clientWidth`, y la capa del borde, vacía y más ancha que su caja por diseño, lo es. Ahora solo cuentan los elementos que tienen texto; el desbordamiento horizontal de la página se sigue comprobando igual.
 
-- [ ] **T29. Equipo con constelaciones: primero `home-page.spec.ts` (cada miembro tiene un emblema SVG `aria-hidden` con 5–8 estrellas, distinto y estable entre cargas; sin imágenes ni nombres completos; el trazo "se dibuja" en 0,8 s al hover o foco solo con animación; sin él, el emblema está completo y estático); después `TeamSection.astro` con `constellationPath` y el CSS.** RF-34, RF-40
+- [x] **T29. Equipo con constelaciones: primero `home-page.spec.ts` (cada miembro tiene un emblema SVG `aria-hidden` con 5–8 estrellas, distinto y estable entre cargas; sin imágenes ni nombres completos; el trazo "se dibuja" en 0,8 s al hover o foco solo con animación; sin él, el emblema está completo y estático); después `TeamSection.astro` con `constellationPath` y el CSS.** RF-34, RF-40
   - Hecho cuando:
     - Los tests pasaron de rojo a verde (y el de la 004 de "sin imágenes de equipo" ajustado solo para permitir el SVG decorativo, si la duda 3 se aprueba).
     - Si la duda 3 se rechaza, esta tarea se omite y se anota.
+    - **Duda 3 aprobada por el usuario** (comunicado por el coordinador el 2026-10-19): emblemas generados por código, sin fotos ni avatares. La pregunta sigue marcada como abierta en `spec.md`: la cierra el coordinador.
+    - **Medido (T29, 2026-10-19):**
+      - **Rojo antes del código:**
+        - Vitest: 1 fallo, `EMBLEM_SIZE` en `constellation.test.ts`.
+        - Playwright: el archivo no cargaba sin `EMBLEM_SIZE`. Con la constante ya añadida, 8 de los 14 casos nuevos de `home-page.spec.ts` seguían en rojo (los 6 que pasaban: emblemas iguales al recargar, que pasaba en vacío, axe y movimiento reducido).
+        - Después, todo en verde en `/` y `/en/`.
+      - **En el HTML, sin JavaScript:** un SVG por persona con `aria-hidden="true"` y `focusable="false"`.
+        - Estrellas: 5–8 por emblema, el número que da `constellationOf(nombre)`; el trazo es `constellationPath(c, 56)`.
+        - Sin texto dentro, y los tres emblemas son distintos.
+        - Sin imágenes en la sección; la prueba de la 004 "sin imágenes" no cambia y sigue en verde: el SVG no es `img`.
+        - En reposo, el emblema está completo.
+      - **Mismo emblema al recargar.**
+      - **Con animación:**
+        - Con el cursor encima, solo las líneas de esa tarjeta se dibujan (`member-draw`, 0,8 s): a mitad aún sin terminar, al acabar completas.
+        - Al salir, sin animación y completas.
+      - **Con movimiento reducido:** completo, nunca se dibuja y `document.getAnimations()` vacío.
+      - **axe en la lista del equipo con un emblema dibujándose:** 0 infracciones y 0 incompletos de contraste.
+      - **A 320 y 375 px:** cada emblema dentro de su tarjeta, sin pisar el nombre ni el rol, y sin desbordamiento.
+      - **Peso:** CSS 8,7 KB gzip (8860 B) y HTML de `/` 10,0 KB gzip.
+      - **Pruebas:** Vitest 62 archivos / 1470; Playwright 698 (`pnpm test` completo); `pnpm lint` y `pnpm format:check` en verde.
+      - **Capturas** a 1280 y 375 px, en reposo y dibujándose, revisadas (fuera del repo).
+    - **Decisiones no previstas por el plan:**
+      - (1) **Foco:** las tarjetas del equipo no tienen nada enfocable (solo nombre y rol; la 004 prohíbe enlaces en ellas). El dibujo se activa con `:hover` y con `:focus-within`, pero no se añade `tabindex` para no crear tres paradas de teclado sin acción. Por eso, hoy el foco no puede activarlo; si se quiere que el teclado lo active, habría que añadir esas paradas (decisión del usuario).
+      - (2) **Estilo:**
+        - Emblema de 56 px (`EMBLEM_SIZE`, nueva en `constellation.ts`) a la derecha del texto, en una rejilla de dos columnas de la tarjeta.
+        - Líneas en `accentGreen` (1,5 px) y estrellas en `buttonHover` (radio 2,4).
+        - Las líneas son un único `path` con `pathLength="1"`: dibujarlas es animar `stroke-dashoffset` de 1 a 0 (`ease-out`).
+        - Los `@keyframes`, dentro de `no-preference`.
 
-- [ ] **T30. Contacto y pie: primero `home-page.spec.ts` (contacto con plataforma de lanzamiento decorativa, isologo sin imagen nueva, pulso del botón cada 3 s solo con animación, `contact.status` y el hueco del formulario intactos; pie con horizonte, satélite que orbita con animación y `footer.detail` en ES y EN sobre fondo sólido; axe y 320/375 px); después `ContactSection.astro`, `SiteFooter.astro` y `CtaButton.astro` (variante `pulse`).** RF-35, RF-36, RF-40, RF-43
+- [x] **T30. Contacto y pie: primero `home-page.spec.ts` (contacto con plataforma de lanzamiento decorativa, isologo sin imagen nueva, pulso del botón cada 3 s solo con animación, `contact.status` y el hueco del formulario intactos; pie con horizonte, satélite que orbita con animación y `footer.detail` en ES y EN sobre fondo sólido; axe y 320/375 px); después `ContactSection.astro`, `SiteFooter.astro` y `CtaButton.astro` (variante `pulse`).** RF-35, RF-36, RF-40, RF-43
   - Hecho cuando:
     - Los tests pasaron de rojo a verde y las 404 no cambian (el pie de las 404 sigue sin el horizonte, salvo que el usuario lo pida).
     - La mención "Mac" del mensaje `mac.arrive.contact` aparece al llegar a contacto.
+    - **Medido (T30, 2026-10-19):**
+      - **Rojo antes del código:** 16 de los 18 casos nuevos de `home-page.spec.ts`; los 2 de "la 404 conserva su pie" ya pasaban. Después, todo en verde en `/` y `/en/`.
+      - **Contacto, sin JavaScript:**
+        - plataforma decorativa (`aria-hidden`) con el isologo `/favicon.svg` (`alt=""`, carga perezosa), una torre y una base de formas de token, sin imagen nueva;
+        - "Formulario próximamente" visible y el hueco del formulario de la 006 (`[data-contact-form]`, vacío y sin altura);
+        - la plataforma no pisa el título, los textos ni el botón; va debajo del botón en móvil y a la derecha desde 48 rem.
+      - **Pulso:** con animación, el "Quiero despegar" de contacto lanza un anillo de luz cada 3 s (`cta-pulse`, `3s`, infinito); el de la cabecera no. Con el cursor encima se para y se ve el resplandor de RF-20.
+      - **Pie de la portada:**
+        - horizonte curvo de planeta (índigo `planetRankiaBg` con atmósfera `earthGlow`) y un satélite;
+        - `footer.text` y `footer.detail` (ES y EN) debajo del horizonte, sobre `bgDark` sólido, sin imagen de fondo;
+        - con animación, el satélite orbita sobre el horizonte (`footer-orbit`, 9 s ida y vuelta, ±10°); sin ella, queda quieto y visible.
+        - Las 404 conservan su pie sin horizonte ni `footer.detail`.
+      - **Mac:** al llegar a contacto (la plataforma al 60 % a la vista) dice `mac.arrive.contact` junto al cohete.
+      - **Movimiento reducido:** sin pulso, sin órbita, sin burbuja y `document.getAnimations()` vacío.
+      - **A 320 y 375 px:** plataforma y satélite dentro de su caja y sin desbordamiento.
+      - **Peso:** CSS 9,3 KB gzip (9569 B; antes 8860); efectos 13,8 KB (14112 B); JS total 51,3 KB (52560 B).
+      - **Pruebas:** Vitest 62 archivos / 1470; Playwright 716 (`pnpm test` completo); `pnpm lint` y `pnpm format:check` en verde.
+    - **Decisiones no previstas por el plan:**
+      - (1) **Pulso con un anillo bajo el botón:** el botón recorta su propio desbordamiento y su `box-shadow` en reposo debe seguir en `none` (prueba de RF-20 de T11). En la variante `pulse`, `CtaButton.astro` envuelve el enlace en `span.cta-pulse` con un `span.cta-ring` vacío (`aria-hidden`) debajo (`z-index` 0 y 1 explícitos, para que axe no dude del fondo), cuya sombra es el anillo. Es la sombra la que se desvanece (color con alfa), no la opacidad, así que no hace falta tocar la lista de `@keyframes` con opacidad 0.
+      - (2) **El disco del planeta es el `::before` de un elemento que solo ocupa la banda del horizonte:**
+        - si el disco gigante es un elemento, su caja llega a los textos del pie y axe deja su contraste como incompleto;
+        - el satélite gira alrededor del centro del planeta (`transform-origin` lejano, `90cqw` con `container-type` en la banda);
+        - todo empieza 5 rem por debajo del borde superior del pie, para que la frontera con contacto siga siendo un color liso (prueba de fundidos de RF-6).
+      - (3) **El hueco del formulario no lleva `display: none`** (prohibido por `motion-css.test.ts`); al estar vacío no ocupa altura.
+      - (4) **Prueba del indicador del viaje de T24 ajustada:** el pie más alto movió el final de la página y en móvil la barra pasó a cubrir una línea entera al final (el solape que el usuario aceptó en R4). En móvil la prueba ya no comprueba el final ni la parada que solo se alcanza allí; en escritorio sigue comprobándolo todo.
+      - (5) **La línea de Mac al llegar a contacto** (`contactArrival` en `mac-fx.ts`, oyente de `IntersectionObserver`) va anclada al cohete de la plataforma: allí no hay ningún Mac a la vista.
 
 - [ ] **T31. REVISIÓN R5: proyectos, equipo, contacto y pie.** RF-33 a RF-36
   - Hecho cuando:
     - `pnpm test`, `pnpm lint`, `pnpm format:check` y `pnpm build` en verde; capturas a 375 px y escritorio, ES y EN, con y sin movimiento reducido.
     - **Parada: push del coordinador y aprobación del usuario en staging.** Anotar el resultado.
-
-## Bloque F: presupuestos y cierre
+    - **Preparación hecha (2026-10-19), pendiente de la aprobación del usuario en staging.**
+      - **Comprobado:** `pnpm test` (Vitest 62 archivos / 1470; Playwright 716), `pnpm lint`, `pnpm format:check` y `pnpm build` (las dos apps) en verde.
+      - **Capturas:** 48, fuera del repo, en la carpeta `r5/` del scratchpad de la sesión. Cubren proyectos (en reposo y con un borde girando), equipo (en reposo y con un emblema dibujándose), contacto y pie, de `/` y `/en/` a 1280×720 y 375×667, con y sin movimiento reducido. Sin errores de consola. La burbuja `mac.arrive.contact` sale en ES y EN al llegar a contacto.
+    - **Puntos a revisar:**
+      - **Emblemas del equipo:** el teclado no activa el dibujo. Las tarjetas no tienen nada enfocable y no se añadió `tabindex` (T29, decisión del coordinador: llevarlo a R5). En móvil, sin cursor, el dibujo solo se ve al tocar la tarjeta.
+      - **Borde cósmico:** gira con el cursor o con el foco en el enlace de la tarjeta. Colores verde, amarillo, naranja y rojo; una vuelta cada 4 s.
+      - **Plataforma de lanzamiento:**
+        - el cohete es el isologo tal cual, con su cuadrado oscuro redondeado de favicon;
+        - va a la derecha del texto en escritorio y debajo del botón en móvil;
+        - la burbuja de Mac sale junto al cohete, aunque allí no hay ningún Mac a la vista.
+      - **Pulso de "Quiero despegar" en contacto:** un anillo amarillo cada 3 s, sutil en las capturas. Revisar si se quiere más visible.
+      - **Pie:**
+        - horizonte índigo con atmósfera azul y un satélite verde con paneles amarillos que va y viene ±10° en 9 s;
+        - "Hecho en la Tierra, con cariño galáctico" en verde de acento bajo el texto de siempre;
+        - el pie de la portada es ahora 8 rem más alto; las 404 no cambian.
+      - **Indicador del viaje en móvil:** con el pie más alto, al final de la página la barra pisa una línea entera de contacto. Es el solape aceptado en R4, ahora algo más visible.
 
 - [ ] **T32. Presupuestos y calidad: primero `budget.spec.ts` ampliada (JS antes de `load` ≤ 3 KB; JS total ≤ 100 KB; módulo de efectos ≤ 30 KB; código propio ≤ 45 KB (total menos GSAP núcleo + Lenis, con el peso medido en T16b); CSS ≤ 30 KB; imágenes sin cambio; tareas largas con CPU ×4 ≤ 300 ms; coste por fotograma y FPS de la medición controlada con la tolerancia fijada en T2; elementos con `will-change` ≤ 10; INP ≤ 200 ms con turbo, ráfagas y salto) y la propuesta de `lighthouserc.cjs` (TBT ≤ 300 ms y Rendimiento ≥ 0,92 en la mediana); después los ajustes necesarios y `pnpm quality`.** RF-37, RF-38, RF-39, RNF-2, RNF-3, RNF-4, RNF-5, RNF-6, RNF-7, RNF-8
   - Hecho cuando:

@@ -3,13 +3,28 @@ import { t, type Locale } from "../lib/i18n";
 
 interface Props {
   locale: Locale;
+  /**
+   * Spec 005, RF-36: the home page's footer has the curved horizon of a
+   * planet with a satellite that orbits it, and a short line of its own. The
+   * 404 pages keep the plain footer.
+   */
+  horizon?: boolean;
 }
 
-const { locale } = Astro.props;
+const { locale, horizon = false } = Astro.props;
 ---
 
 <footer class="site-footer">
-  <p class="site-footer__inner">{t(locale, "footer.text")}</p>
+  {horizon && (
+    <div class="site-footer__horizon" aria-hidden="true">
+      <span class="site-footer__planet" />
+      <span class="site-footer__satellite" />
+    </div>
+  )}
+  <div class="site-footer__inner">
+    <p>{t(locale, "footer.text")}</p>
+    {horizon && <p class="site-footer__detail">{t(locale, "footer.detail")}</p>}
+  </div>
 </footer>
 
 <style>
@@ -23,5 +38,96 @@ const { locale } = Astro.props;
     max-width: 60rem;
     margin: 0 auto;
     padding: 1.5rem 1rem;
+  }
+
+  .site-footer__inner p {
+    margin: 0;
+  }
+
+  .site-footer__inner .site-footer__detail {
+    margin-top: 0.4rem;
+    color: var(--color-accent-green);
+  }
+
+  /* RF-36: a band over the texts with the top of a huge planet (Earth: the
+     indigo of the brand with a blue atmosphere). Everything starts 5 rem
+     down the band, so the boundary with the contact section above stays a
+     plain colour. The satellite turns around the planet's centre (far
+     below): a tiny element with a far transform-origin, on the compositor.
+     The planet is 180 % of the band wide: its radius is 90 cqw. */
+  .site-footer__horizon {
+    position: relative;
+    container-type: inline-size;
+    height: 8rem;
+    overflow: hidden;
+  }
+
+  /* The planet's element only spans the band; the huge disc is its ::before,
+     clipped by the band: no element box reaches the texts below (axe looks
+     at those boxes to find the background of the texts). */
+  .site-footer__planet {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+  }
+
+  .site-footer__planet::before {
+    content: "";
+    position: absolute;
+    top: 5rem;
+    left: 50%;
+    width: 180%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    background: var(--color-planet-rankia-bg);
+    box-shadow:
+      0 0 0 2px var(--color-earth-glow),
+      0 0 18px 2px var(--color-earth-glow);
+  }
+
+  .site-footer__satellite {
+    position: absolute;
+    /* 1.6 rem over the surface, at the top of the orbit. */
+    top: calc(5rem - 1.6rem - 0.5rem);
+    left: calc(50% - 0.5rem);
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.2rem;
+    background: var(--color-accent-green);
+    transform-origin: 50% calc(90cqw + 1.6rem + 0.5rem);
+    transform: rotate(-8deg);
+  }
+
+  /* Two solar panels. */
+  .site-footer__satellite::before {
+    content: "";
+    position: absolute;
+    top: 0.3rem;
+    left: -0.9rem;
+    width: 2.8rem;
+    height: 0.4rem;
+    background: linear-gradient(
+      90deg,
+      var(--color-button-hover) 0 32%,
+      transparent 32% 68%,
+      var(--color-button-hover) 68%
+    );
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .site-footer__satellite {
+      animation: footer-orbit 9s ease-in-out infinite alternate;
+    }
+
+    @keyframes footer-orbit {
+      from {
+        transform: rotate(-10deg);
+      }
+
+      to {
+        transform: rotate(10deg);
+      }
+    }
   }
 </style>

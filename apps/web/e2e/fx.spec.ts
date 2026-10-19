@@ -1702,16 +1702,21 @@ for (const { path } of homePages) {
           await page.goto(path);
           await page.waitForSelector(FX_ON, { timeout: 10_000 });
           await expect(page.locator(JOURNEY)).toHaveCount(1);
+          const max = await page.evaluate(
+            () => document.documentElement.scrollHeight - innerHeight,
+          );
+          // On phones the bar at the top may cover a line at the very end of
+          // the page (accepted by the user in R4, T27): the end, and a section
+          // that can only be reached there, are checked on the desktop only.
           const positions: (number | "end")[] = [
             0,
-            ...(await sectionStops(page)),
-            "end",
+            ...(await sectionStops(page)).filter(
+              (y) => view.vertical || y < max - 1,
+            ),
+            ...(view.vertical ? (["end"] as const) : []),
           ];
           if (view.vertical) {
             // The right edge stays clear all the way down.
-            const max = await page.evaluate(
-              () => document.documentElement.scrollHeight - innerHeight,
-            );
             for (let i = 1; i < 12; i++) {
               positions.push(Math.round((max * i) / 12));
             }

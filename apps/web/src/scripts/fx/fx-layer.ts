@@ -9,6 +9,7 @@ import { createBubbles } from "./bubbles";
 import { createFxCanvas, type FxCanvas } from "./canvas";
 import { cursorTrail, type CursorReport } from "./cursor-trail";
 import {
+  contactArrival,
   macBursts,
   macFlight,
   macReactions,
@@ -173,6 +174,8 @@ function startTier(
   const bubbles = createBubbles(rng);
   hooks.onHide.push(bubbles.clear);
   cleanups.push(hub.onLayout(bubbles.clear), bubbles.stop);
+  // T30: his line on arriving at the contact section.
+  cleanups.push(contactArrival(bubbles));
   // RF-21 to RF-24: Mac flies along a curve between planets, in every class,
   // with his trail, the bounce on landing and the planet's line.
   // RF-25 to RF-27: the gaze (fine pointer, middle and high class), the

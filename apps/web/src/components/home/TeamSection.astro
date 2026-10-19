@@ -1,14 +1,27 @@
 ---
 import { t, type Locale } from "../../lib/i18n";
 import { TEAM } from "../../lib/site-data";
+import {
+  EMBLEM_SIZE,
+  constellationOf,
+  constellationPath,
+} from "../../lib/sky/constellation";
 
 // RF-8: three people, only first name and role. No photos, avatars or
-// surnames.
+// surnames. Spec 005, RF-34 (plan D18): beside each name, a decorative
+// constellation generated from it (5 to 8 stars, always the same), in the
+// HTML and hidden from assistive technology; with animation its lines draw
+// themselves in 0.8 s under the cursor.
 interface Props {
   locale: Locale;
 }
 
 const { locale } = Astro.props;
+const emblems = TEAM.map((person) => {
+  const c = constellationOf(person.name);
+  return { stars: c.stars, d: constellationPath(c, EMBLEM_SIZE) };
+});
+const viewBox = `0 0 ${EMBLEM_SIZE} ${EMBLEM_SIZE}`;
 ---
 
 <section id="team" class="team" aria-labelledby="team-heading">
@@ -20,10 +33,27 @@ const { locale } = Astro.props;
       {t(locale, "team.intro")}
     </p>
     <ul class="team__list">
-      {TEAM.map((person) => (
+      {TEAM.map((person, i) => (
         <li class="member">
           <h3>{person.name}</h3>
           <p>{t(locale, person.roleKey)}</p>
+          <svg
+            class="member__emblem"
+            viewBox={viewBox}
+            width={EMBLEM_SIZE}
+            height={EMBLEM_SIZE}
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d={emblems[i]!.d} pathLength="1" />
+            {emblems[i]!.stars.map((star) => (
+              <circle
+                cx={(star.x * EMBLEM_SIZE).toFixed(2)}
+                cy={(star.y * EMBLEM_SIZE).toFixed(2)}
+                r="2.4"
+              />
+            ))}
+          </svg>
         </li>
       ))}
     </ul>
@@ -63,9 +93,55 @@ const { locale } = Astro.props;
   }
 
   .member {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 1rem;
+    align-items: center;
     padding: 1.25rem 1.5rem;
     border-left: 4px solid var(--color-button);
     background: var(--color-bg);
+  }
+
+  .member h3,
+  .member p {
+    grid-column: 1;
+  }
+
+  /* The emblem: lines in the green accent, stars in the yellow of the
+     buttons. The lines are one path of length 1 (pathLength), so drawing
+     them is moving the dash offset from 1 to 0. At rest, whole. */
+  .member__emblem {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    overflow: visible;
+  }
+
+  .member__emblem path {
+    fill: none;
+    stroke: var(--color-accent-green);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+
+  .member__emblem circle {
+    fill: var(--color-button-hover);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .member:is(:hover, :focus-within) .member__emblem path {
+      animation: member-draw 0.8s ease-out;
+    }
+
+    @keyframes member-draw {
+      from {
+        stroke-dashoffset: 1;
+      }
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
   }
 
   .member h3 {

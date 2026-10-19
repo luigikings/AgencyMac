@@ -536,7 +536,11 @@ test.describe("Projects and team on a phone", () => {
           .filter(
             (element) =>
               element.scrollWidth > element.clientWidth + 1 &&
-              getComputedStyle(element).display !== "inline",
+              getComputedStyle(element).display !== "inline" &&
+              // Only what holds text can cut it (spec 005, T28: the cosmic
+              // border of the project cards is an empty layer wider than its
+              // box, clipped by the card).
+              (element.textContent ?? "").trim() !== "",
           )
           .map((element) => element.tagName),
       );

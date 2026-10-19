@@ -9,14 +9,25 @@ interface Props {
   locale: Locale;
   /** Where it goes; the contact section by default. */
   href?: string;
+  /** Spec 005, RF-35: with animation, a pulse every 3 s (contact section). */
+  pulse?: boolean;
 }
 
-const { locale, href = CTA_TARGET } = Astro.props;
+const { locale, href = CTA_TARGET, pulse = false } = Astro.props;
 ---
 
-<a class="cta" href={href}>
-  {t(locale, "cta.takeOff")}
-</a>
+{pulse ? (
+  <span class="cta-pulse">
+    <a class="cta" href={href}>
+      {t(locale, "cta.takeOff")}
+    </a>
+    <span class="cta-ring" aria-hidden="true" />
+  </span>
+) : (
+  <a class="cta" href={href}>
+    {t(locale, "cta.takeOff")}
+  </a>
+)}
 
 <style>
   /* Colours come only from the brand tokens (src/styles/tokens.ts). */
@@ -41,6 +52,26 @@ const { locale, href = CTA_TARGET } = Astro.props;
   .cta:hover,
   .cta:focus-visible {
     background: var(--color-button-hover);
+  }
+
+  /* Pulse variant (contact section): the ring sits under the button, both
+     positioned with an explicit order so the stack is plain for axe too. */
+  .cta-pulse {
+    position: relative;
+    display: inline-block;
+    border-radius: 999px;
+  }
+
+  .cta-pulse .cta {
+    z-index: 1;
+  }
+
+  .cta-ring {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
   }
 
   /* Shine, parked to the left until the button is hovered or focused. */
@@ -85,6 +116,32 @@ const { locale, href = CTA_TARGET } = Astro.props;
 
     .cta:active {
       transform: translateY(-2px) scale(0.97);
+    }
+
+    /* RF-35: a ring of light leaves the button every 3 s. It is the shadow of
+       an empty element under the button (the button clips its own
+       overflow), and it stops under the cursor or the focus, where the glow
+       of RF-20 shows. */
+    .cta-ring {
+      animation: cta-pulse 3s ease-out infinite;
+    }
+
+    .cta-pulse:hover .cta-ring,
+    .cta-pulse:focus-within .cta-ring {
+      animation: none;
+    }
+
+    @keyframes cta-pulse {
+      0% {
+        box-shadow: 0 0 0 0
+          color-mix(in srgb, var(--color-button-hover) 70%, transparent);
+      }
+
+      35%,
+      100% {
+        box-shadow: 0 0 0 14px
+          color-mix(in srgb, var(--color-button-hover) 0%, transparent);
+      }
     }
 
     @keyframes cta-sweep {

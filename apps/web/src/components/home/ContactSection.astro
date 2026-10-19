@@ -3,7 +3,10 @@ import { t, type Locale } from "../../lib/i18n";
 import CtaButton from "../CtaButton.astro";
 
 // RF-9, RF-10: the target of "Quiero despegar". Until the form exists (spec
-// 006) it says so openly; spec 006 puts the form inside this section.
+// 006) it says so openly; spec 006 puts the form inside this section, in the
+// room kept for it (data-contact-form). Spec 005, RF-35: a decorative launch
+// pad with the isologo (/favicon.svg, no new image) as its rocket, and the
+// button pulses every 3 s with animation.
 interface Props {
   locale: Locale;
 }
@@ -22,7 +25,22 @@ const { locale } = Astro.props;
     <p class="contact__status" data-sky-text>
       {t(locale, "contact.status")}
     </p>
-    <CtaButton locale={locale} />
+    <CtaButton locale={locale} pulse />
+    {/* Room for the form of spec 006: empty (no height) until then. */}
+    <div class="contact__form" data-contact-form></div>
+    <div class="contact__launch" aria-hidden="true">
+      <img
+        class="contact__rocket"
+        src="/favicon.svg"
+        alt=""
+        width="64"
+        height="64"
+        loading="lazy"
+        decoding="async"
+      />
+      <span class="contact__tower"></span>
+      <span class="contact__pad"></span>
+    </div>
   </div>
 </section>
 
@@ -33,10 +51,68 @@ const { locale } = Astro.props;
   }
 
   .contact__inner {
+    position: relative;
     box-sizing: border-box;
     max-width: 60rem;
     margin: 0 auto;
     padding: 3rem 1rem 4rem;
+  }
+
+  /* The launch pad: below the button on narrow screens, on the right of the
+     texts from 48 rem. Solid shapes of the brand and the isologo on top. */
+  .contact__launch {
+    position: relative;
+    width: 9rem;
+    height: 8rem;
+    margin: 2rem auto 0;
+  }
+
+  .contact__rocket {
+    position: absolute;
+    left: 50%;
+    bottom: 1.1rem;
+    width: 4rem;
+    height: 4rem;
+    transform: translateX(-50%);
+  }
+
+  .contact__tower {
+    position: absolute;
+    left: 1rem;
+    bottom: 1rem;
+    width: 0.9rem;
+    height: 6rem;
+    border: 2px solid var(--color-accent-green);
+    border-bottom: 0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent 0 6px,
+      var(--color-accent-green) 6px 8px
+    );
+  }
+
+  .contact__pad {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1rem;
+    border-radius: 0.5rem 0.5rem 0.25rem 0.25rem;
+    background: var(--color-logo-gradient-2);
+    box-shadow: inset 0 -4px 0 var(--color-logo-gradient-4);
+  }
+
+  @media (min-width: 48rem) {
+    .contact__inner {
+      padding-right: 13rem;
+    }
+
+    .contact__launch {
+      position: absolute;
+      right: 2rem;
+      bottom: 4rem;
+      margin: 0;
+    }
   }
 
   .contact h2 {

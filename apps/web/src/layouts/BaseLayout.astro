@@ -97,7 +97,7 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
     <main id="content" class:list={{ "main--full": fullWidth }}>
       <slot />
     </main>
-    <SiteFooter locale={locale} />
+    <SiteFooter locale={locale} horizon={sky} />
   </body>
 </html>
 
