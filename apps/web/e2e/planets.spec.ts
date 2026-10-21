@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { TIER_PARAMS } from "../src/lib/fx/fx-config";
 import { colors } from "../src/styles/tokens";
 import { homePages } from "./pages";
 
@@ -699,3 +700,175 @@ for (const reduced of [false, true]) {
     }
   });
 }
+
+// Spec 005, RF-12 and RF-37 (validation, round 1): with the class known
+// (`data-fx-tier`), only the moons of TIER_PARAMS keep orbiting; the rest
+// stand still at their own point (the HTML keeps 1, 2 and 1).
+const TIER_VIEWS = [
+  {
+    tier: "low",
+    name: "375 px touch phone, low class",
+    use: {
+      viewport: { width: 375, height: 667 },
+      hasTouch: true,
+      isMobile: true,
+    },
+    cores: 8,
+  },
+  {
+    tier: "mid",
+    name: "desktop with 4 cores, middle class",
+    use: { viewport: { width: 1280, height: 800 } },
+    cores: 4,
+  },
+  {
+    tier: "high",
+    name: "desktop with 8 cores, high class",
+    use: { viewport: { width: 1280, height: 800 } },
+    cores: 8,
+  },
+] as const;
+
+test.describe("Moons of each class (RF-12, RF-37)", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  for (const view of TIER_VIEWS) {
+    test.describe(view.name, () => {
+      test.use(view.use);
+
+      for (const { path } of homePages) {
+        test(`${path}: orbiting moons per planet as in TIER_PARAMS.${view.tier}`, async ({
+          page,
+        }) => {
+          await page.addInitScript((cores) => {
+            Object.defineProperty(Navigator.prototype, "hardwareConcurrency", {
+              configurable: true,
+              get: () => cores,
+            });
+            Object.defineProperty(Navigator.prototype, "deviceMemory", {
+              configurable: true,
+              get: () => 8,
+            });
+          }, view.cores);
+          await page.goto(path);
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-fx-tier",
+            view.tier,
+            { timeout: 10_000 },
+          );
+          const counts = await page.evaluate(
+            (ids) => {
+              return ids.map((id) => {
+                const moons = [
+                  ...document.querySelectorAll(
+                    `[data-planet="${id}"] [data-moon]`,
+                  ),
+                ];
+                return {
+                  shown: moons.filter(
+                    (m) => getComputedStyle(m).visibility === "visible",
+                  ).length,
+                  orbiting: moons.filter((m) =>
+                    m
+                      .getAnimations()
+                      .some(
+                        (a) =>
+                          (a as CSSAnimation).animationName === "planet-moon" &&
+                          a.playState !== "idle",
+                      ),
+                  ).length,
+                };
+              });
+            },
+            PLANETS.map((p) => p.id),
+          );
+          expect(counts.map((c) => c.orbiting)).toEqual([
+            ...TIER_PARAMS[view.tier].moonsPerPlanet,
+          ]);
+          // The still ones are still there (nothing is hidden).
+          expect(counts.map((c) => c.shown)).toEqual(
+            PLANETS.map((p) => p.moons),
+          );
+        });
+      }
+    });
+  }
+});
+
+// Spec 005, RF-12 (changed 2026-10-19): in the low class the moons that do
+// not orbit stand still at their own pose of T14, like without animation:
+// inside the art, apart from the other moon and never in a corner of the box
+// of the orbit.
+test.describe("Still moons of the low class (RF-12)", () => {
+  test.use({
+    reducedMotion: "no-preference",
+    viewport: { width: 375, height: 800 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  for (const { path } of homePages) {
+    test(`${path} at 375 px, low class: the still moon is inside the art, apart from its sister`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-fx-tier",
+        "low",
+        { timeout: 10_000 },
+      );
+      for (const planet of PLANETS) {
+        const result = await page.locator(block(planet.id)).evaluate((el) => {
+          // The moons that orbit go back to their still pose; the still ones
+          // have no animation to cancel.
+          for (const a of el.getAnimations({ subtree: true })) a.cancel();
+          const art = el
+            .querySelector(".service__art")!
+            .getBoundingClientRect();
+          const moonEls = [...el.querySelectorAll<HTMLElement>("[data-moon]")];
+          const moons = moonEls.map((moon) => moon.getBoundingClientRect());
+          // On the orbit's own axes (its tilt removed for the measure), the
+          // centre of each moon must lie on ellipse(46% 37%): the box of the
+          // tilted orbit is larger than the orbit, and a moon left on the
+          // corner of its box (offset-path not resolved by Chromium) can fall
+          // outside a fixed corner margin of that box.
+          const orbitEl = el.querySelector<HTMLElement>(".service__orbit")!;
+          orbitEl.style.transform = "none";
+          const orbit = orbitEl.getBoundingClientRect();
+          const onOrbit = moonEls.map((moon) => {
+            const r = moon.getBoundingClientRect();
+            const x = (r.left + r.width / 2 - orbit.left) / orbit.width;
+            const y = (r.top + r.height / 2 - orbit.top) / orbit.height;
+            const d = ((x - 0.5) / 0.46) ** 2 + ((y - 0.5) / 0.37) ** 2;
+            return Math.abs(d - 1) < 0.15;
+          });
+          orbitEl.style.transform = "";
+          return {
+            inside: moons.map(
+              (r) =>
+                r.width > 0 &&
+                r.left >= art.left - 0.5 &&
+                r.right <= art.right + 0.5 &&
+                r.top >= art.top - 0.5 &&
+                r.bottom <= art.bottom + 0.5,
+            ),
+            onOrbit,
+            overlap:
+              moons.length === 2 &&
+              moons[0]!.left < moons[1]!.right &&
+              moons[1]!.left < moons[0]!.right &&
+              moons[0]!.top < moons[1]!.bottom &&
+              moons[1]!.top < moons[0]!.bottom,
+          };
+        });
+        expect(result.inside, planet.id).toEqual(
+          Array.from({ length: planet.moons }, () => true),
+        );
+        expect(result.onOrbit, planet.id).toEqual(
+          Array.from({ length: planet.moons }, () => true),
+        );
+        expect(result.overlap, planet.id).toBe(false);
+      }
+    });
+  }
+});

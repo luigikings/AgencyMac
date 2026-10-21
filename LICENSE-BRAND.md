@@ -38,7 +38,7 @@ Esta reserva alcanza también a los derivados de esos elementos que contiene el 
 Las tipografías, librerías y otros recursos de terceros que use el proyecto mantienen sus propias licencias, que prevalecen sobre este documento en lo que les afecte:
 
 - **Lilita One y Lato** (tipografías): SIL Open Font License 1.1, con su texto en `apps/web/src/assets/fonts/`.
-- **GSAP** 3.15.0 (y su plugin ScrollTrigger): Standard 'no charge' license de GreenSock (hoy Webflow), https://gsap.com/standard-license. Gratuita también en uso comercial; no se copia al repositorio (es una dependencia) y su aviso de licencia se conserva en el JS publicado.
+- **GSAP** 3.15.0 (solo su núcleo; el plugin ScrollTrigger viene en el mismo paquete, pero la web no lo usa ni lo publica desde la spec 005): Standard 'no charge' license de GreenSock (hoy Webflow), https://gsap.com/standard-license. Gratuita también en uso comercial; no se copia al repositorio (es una dependencia) y su aviso de licencia se conserva en el JS publicado.
 - **Lenis** 1.3.26: licencia MIT.
 - **sharp**: licencia Apache-2.0. Solo se usa en los scripts que generan las imágenes derivadas, no viaja en la web.
 

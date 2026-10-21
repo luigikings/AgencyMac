@@ -5,7 +5,7 @@ Monorepo de AgencyMac (agencia de Marketing, Análisis y Coding). Contiene la we
 ## Stack y estructura
 
 - Monorepo con pnpm workspaces. Código en TypeScript.
-- `apps/web`: web pública. Astro + GSAP/ScrollTrigger + Lenis + Rive. Idiomas ES (principal) y EN.
+- `apps/web`: web pública. Astro + GSAP + Lenis + Rive (ScrollTrigger no se usa desde la spec 005, D19). Idiomas ES (principal) y EN.
 - `apps/control`: Centro de Control (uso interno). React. Protegido con Cloudflare Access.
 - Infraestructura: Cloudflare (Workers con static assets, D1 como base de datos, Access como login) y Resend (correos). CI en GitHub Actions; entorno de prueba en el Worker `agencymac-staging` (`docs/staging.md`).
 - Cada app tiene su propio `AGENTS.md` con sus reglas específicas.

@@ -201,9 +201,10 @@ informe: en el evento "fx:report" escribe en <html data-fx-frame-avg / data-fx-f
 | Rastro del cursor                         | no            | no                       | ≤ 14 partículas         |
 | Salto en el espacio (trazos máximos)      | no            | 40                       | 80                      |
 | Lunas por planeta (animadas)              | 1             | 1 / 2 / 1                | 1 / 2 / 1               |
+| Lunas por planeta (visibles)              | 1 / 2 / 1     | 1 / 2 / 1                | 1 / 2 / 1               |
 | Indicador de viaje, burbujas, viajero     | sí            | sí                       | sí                      |
 
-Notas: la clase baja es el camino del móvil (sin Lenis, sin ratón); el cielo CSS y la entrada del hero son idénticos en todas, porque son CSS y su coste es de compositor. La clase se anota en `data-fx-tier` en `<html>`. Memoria y núcleos pueden no estar disponibles (Safari, Firefox): se tratan como "no limitan" salvo que el resto de señales digan lo contrario.
+Notas: ninguna clase oculta lunas (RF-12, cambio del 2026-10-19): en clase baja la 2.ª luna de Rankia no se anima y queda quieta y visible en su pose de T14, dentro de la órbita. La clase baja es el camino del móvil (sin Lenis, sin ratón); el cielo CSS y la entrada del hero son idénticos en todas, porque son CSS y su coste es de compositor. La clase se anota en `data-fx-tier` en `<html>`. Memoria y núcleos pueden no estar disponibles (Safari, Firefox): se tratan como "no limitan" salvo que el resto de señales digan lo contrario.
 
 ### Reglas de coste
 

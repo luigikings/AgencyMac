@@ -11,10 +11,19 @@ const read = (path) =>
 describe("Lighthouse CI configuration of the web", () => {
   const config = read("../apps/web/lighthouserc.cjs");
 
-  it("asserts a total blocking time of at most 200 ms on the median run", () => {
-    expect(config).toMatch(/const MAX_TBT_MS = 200;/);
+  // Spec 005, T32: 300 ms with the effects layer (plan section 8, T2).
+  it("asserts a total blocking time of at most 300 ms on the median run", () => {
+    expect(config).toMatch(/const MAX_TBT_MS = 300;/);
     expect(config).toMatch(
       /"total-blocking-time":\s*\[\s*"error",\s*\{\s*maxNumericValue: MAX_TBT_MS,\s*aggregationMethod: "median-run"/,
+    );
+  });
+
+  // Spec 005, T32: performance at 0.92 or more in the median run.
+  it("asserts a performance of at least 0.92 on the median run", () => {
+    expect(config).toMatch(/const MIN_PERFORMANCE = 0\.92;/);
+    expect(config).toMatch(
+      /"categories:performance":\s*\[\s*"error",\s*\{\s*minScore: MIN_PERFORMANCE,\s*aggregationMethod: "median-run"/,
     );
   });
 

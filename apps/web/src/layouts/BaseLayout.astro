@@ -8,6 +8,7 @@ import { SITE_NAME, buildPageTitle } from "../lib/site";
 import { alternateLinks, canonicalUrl, type SocialMetaTag } from "../lib/seo";
 import { ambientsCss } from "../lib/sky/ambient-css";
 import { skyStarsCss } from "../lib/sky/sky-css";
+import { tierLimitsCss } from "../lib/sky/tier-css";
 import { colors, fontPreloads, fonts, tokensToCss } from "../styles/tokens";
 
 interface Props {
@@ -90,6 +91,7 @@ const alternates = seo ? alternateLinks(site, seo.path) : [];
     <style is:inline set:html={tokensToCss(colors)} />
     {sky && <style is:inline id="sky-stars" set:html={skyStarsCss()} />}
     {sky && <style is:inline id="sky-ambients" set:html={ambientsCss()} />}
+    {sky && <style is:inline id="fx-tier-limits" set:html={tierLimitsCss()} />}
   </head>
   <body data-sky={sky ? "" : undefined}>
     {sky && <SkyBackdrop />}

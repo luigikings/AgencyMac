@@ -1418,6 +1418,57 @@ test.describe("frame cost of the effects", () => {
   });
 });
 
+// RNF-7 (plan section 8; validation, round 1): on a phone of the low class
+// with the CPU 4 times slower, the p95 of the own cost per frame (update and
+// draw, read with `fx:report`) stays at 16 ms or less while the page scrolls
+// on its own for 6 s (Mac flies between the planets with his trail). In the
+// project that measures alone (`web-latency`).
+test.describe("frame cost of the effects, low class", () => {
+  test.use({
+    viewport: { width: 375, height: 667 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test("low class, CPU x4, 375 px touch: p95 <= 16 ms", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(60_000);
+    const errors = watchErrors(page);
+    await simulate(page, { cores: 8, memory: 8 });
+    await page.goto(`/?seed=${SEED}`);
+    await page.waitForSelector(FX_ON, { timeout: 10_000 });
+    await expect(page.locator("html")).toHaveAttribute("data-fx-tier", "low");
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    const before = (await frameReport(page)).frames;
+    await page.evaluate(async () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const start = performance.now();
+      await new Promise<void>((done) => {
+        const tick = (now: number) => {
+          const t = (now - start) / 6000;
+          window.scrollTo(0, max * (0.5 - 0.5 * Math.cos(t * 2 * Math.PI)));
+          if (t < 1) requestAnimationFrame(tick);
+          else done();
+        };
+        requestAnimationFrame(tick);
+      });
+    });
+    // Let the last flight land and its trail fade.
+    await page.waitForTimeout(2000);
+    const report = await frameReport(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    const line = `frames ${report.frames - before}, mean ${report.avg.toFixed(3)} ms, p95 ${report.p95.toFixed(3)} ms`;
+    testInfo.annotations.push({ type: "frame cost", description: line });
+    console.log(`frame cost (low, CPU x4, 375 px): ${line}`);
+    // The trail of the flights is drawn: the measure is not empty.
+    expect(report.frames - before).toBeGreaterThan(20);
+    expect(report.p95).toBeLessThanOrEqual(16);
+    expect(errors).toEqual([]);
+  });
+});
+
 // Spec 005, T24: journey indicator (RF-30, RF-42, RNF-11). With animation, a
 // fixed rail on the edge of the window (a bar along the top on phones, at
 // most 6 px thick; vertical on the right from 64 rem) with one stop per

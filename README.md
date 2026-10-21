@@ -22,7 +22,7 @@ Ahora mismo ambas aplicaciones son esqueletos mínimos: la base técnica (herram
 ## Tecnologías
 
 - **Monorepo**: pnpm workspaces y TypeScript.
-- **Web pública**: [Astro](https://astro.build), con GSAP/ScrollTrigger, Lenis y Rive para las animaciones.
+- **Web pública**: [Astro](https://astro.build), con GSAP, Lenis y Rive para las animaciones.
 - **Centro de Control**: React + Vite.
 - **Infraestructura**: Cloudflare Workers con archivos estáticos (entorno de prueba de la web); previstos D1 como base de datos, Access como login y Resend para los correos. CI en GitHub Actions.
 - **Calidad**: Vitest (lógica), Playwright + axe (flujos end-to-end y accesibilidad), Lighthouse CI (rendimiento, accesibilidad, buenas prácticas y SEO), ESLint y Prettier.

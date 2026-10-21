@@ -22,8 +22,13 @@ const MIN_SCORE = 0.9;
 // Core Web Vitals (RNF-2), asserted on the median run of each URL.
 const MAX_LCP_MS = 2500;
 const MAX_CLS = 0.1;
-// Total blocking time (the lab indicator of INP), spec 004: at most 200 ms.
-const MAX_TBT_MS = 200;
+// Total blocking time (the lab indicator of INP): at most 300 ms with the
+// effects layer of spec 005 (plan section 8, confirmed in T2; 200 ms in 004).
+const MAX_TBT_MS = 300;
+// Spec 005, T32: performance at 0.92 or more in the median run (internal
+// target of plan section 8; the floor of the constitution stays at 0.9 for
+// the other three categories).
+const MIN_PERFORMANCE = 0.92;
 const assertCategory = [
   "error",
   { minScore: MIN_SCORE, aggregationMethod: "median-run" },
@@ -45,7 +50,10 @@ module.exports = {
     },
     assert: {
       assertions: {
-        "categories:performance": assertCategory,
+        "categories:performance": [
+          "error",
+          { minScore: MIN_PERFORMANCE, aggregationMethod: "median-run" },
+        ],
         "categories:accessibility": assertCategory,
         "categories:best-practices": assertCategory,
         "categories:seo": assertCategory,

@@ -4,9 +4,11 @@ const isCI = !!process.env.CI;
 // Spec 003 (RF-11, P7): the CI builds once and sets PREBUILT_DIST=1 so the
 // web servers only serve that build. Locally (no variable) they build first.
 const prebuilt = process.env.PREBUILT_DIST === "1";
-// Titles of the tests that measure time (interaction latency and the frame
-// cost of the effects), which get a project of their own.
-const INTERACTION_LATENCY = /interaction latency|frame cost/;
+// Titles of the tests that measure time (interaction latency, the frame cost
+// of the effects and, spec 005 validation round 1, the long tasks with the
+// CPU x4), which get a project of their own: other workers would skew them.
+const INTERACTION_LATENCY =
+  /interaction latency|frame cost|long tasks with the CPU/;
 const serve = (app: string) =>
   prebuilt
     ? `pnpm --filter ${app} preview`

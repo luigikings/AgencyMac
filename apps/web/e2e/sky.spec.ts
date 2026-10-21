@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { TIER_PARAMS } from "../src/lib/fx/fx-config";
 import { homePages, pages } from "./pages";
 
 // Spec 005, T9: the base sky (RF-1, RF-3, RF-9, RF-40, RF-42). Three fixed
@@ -323,5 +324,78 @@ test.describe("No horizontal overflow with the sky", () => {
         expect(overflow).toBeLessThanOrEqual(0);
       });
     }
+  }
+});
+
+// Spec 005, RF-3 and RF-37 (validation, round 1): with the class known
+// (`data-fx-tier`), only TIER_PARAMS[tier].twinkleLayers layers twinkle (the
+// first ones); the HTML and CSS without JavaScript keep the three.
+test.describe("Twinkling layers of each class (RF-3, RF-37)", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  for (const view of [
+    {
+      tier: "low",
+      name: "375 px touch phone, low class",
+      use: {
+        viewport: { width: 375, height: 667 },
+        hasTouch: true,
+        isMobile: true,
+      },
+      cores: 8,
+    },
+    {
+      tier: "mid",
+      name: "desktop with 4 cores, middle class",
+      use: { viewport: { width: 1280, height: 800 } },
+      cores: 4,
+    },
+    {
+      tier: "high",
+      name: "desktop with 8 cores, high class",
+      use: { viewport: { width: 1280, height: 800 } },
+      cores: 8,
+    },
+  ] as const) {
+    test.describe(view.name, () => {
+      test.use(view.use);
+
+      for (const { path } of homePages) {
+        test(`${path}: twinkling layers as in TIER_PARAMS.${view.tier}`, async ({
+          page,
+        }) => {
+          await page.addInitScript((cores) => {
+            Object.defineProperty(Navigator.prototype, "hardwareConcurrency", {
+              configurable: true,
+              get: () => cores,
+            });
+            Object.defineProperty(Navigator.prototype, "deviceMemory", {
+              configurable: true,
+              get: () => 8,
+            });
+          }, view.cores);
+          await page.goto(path);
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-fx-tier",
+            view.tier,
+            { timeout: 10_000 },
+          );
+          const twinkling = await page.evaluate(() =>
+            [...document.querySelectorAll<HTMLElement>("[data-star-layer]")]
+              .filter((layer) =>
+                layer
+                  .getAnimations()
+                  .some(
+                    (a) => (a as CSSAnimation).animationName === "sky-twinkle",
+                  ),
+              )
+              .map((layer) => layer.dataset.starLayer),
+          );
+          expect(twinkling).toEqual(
+            LAYERS.slice(0, TIER_PARAMS[view.tier].twinkleLayers),
+          );
+        });
+      }
+    });
   }
 });
